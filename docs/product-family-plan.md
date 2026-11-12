@@ -1,6 +1,8 @@
 # Terra product-family architecture — approval draft
 
-Status: PLAN ONLY. No application/schema migrations, Shopify changes, product exports or hosting changes implemented by this document. Existing source is a Vite/React browser configurator in `terrain-ring/`; none of the proposed packages/apps/API/database exist. `docs/product-brief.md` and `docs/manufacturing-rules.md` are also absent. Read alongside `production-output.md` and `shape-refinement.md`.
+Status: Milestone 1 was approved and implemented; see [foundation guide](product-family-foundation.md). Later milestones remain planned. The paragraphs below record the approved architecture baseline.
+
+Original planning status: PLAN ONLY. No application/schema migrations, Shopify changes, product exports or hosting changes implemented by this document. Existing source is a Vite/React browser configurator in `terrain-ring/`; none of the proposed packages/apps/API/database exist. `docs/product-brief.md` and `docs/manufacturing-rules.md` are also absent. Read alongside `production-output.md` and `shape-refinement.md`.
 
 ## 1. Decisions and boundaries
 

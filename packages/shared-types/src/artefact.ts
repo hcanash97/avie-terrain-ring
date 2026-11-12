@@ -1,0 +1,38 @@
+import { z } from "zod";
+import {
+  identifierSchema,
+  productIdSchema,
+  sha256Schema,
+  versionSchema,
+} from "./primitives";
+export const artefactSchema = z.strictObject({
+  id: z.uuid(),
+  kind: z.enum([
+    "mesh",
+    "production_spec",
+    "validation_report",
+    "checksum_manifest",
+    "render_front",
+    "render_side",
+    "render_three_quarter",
+    "design_snapshot",
+    "heightmap_metadata",
+  ]),
+  configurationVersionId: z.uuid(),
+  configurationHash: sha256Schema,
+  terrainVersionId: z.uuid(),
+  terrainHash: sha256Schema,
+  productType: productIdSchema,
+  constraintProfileId: identifierSchema,
+  constraintVersion: versionSchema,
+  constraintHash: sha256Schema,
+  geometryVersion: identifierSchema,
+  purpose: z.enum(["preview", "review_sample", "production"]),
+  format: z.enum(["stl", "3dm", "pdf", "json", "png"]),
+  objectKey: identifierSchema,
+  checksum: sha256Schema,
+  byteLength: z.number().int().positive(),
+  units: z.literal("mm"),
+  scale: z.literal(1),
+  createdAt: z.iso.datetime(),
+});

@@ -1,0 +1,2 @@
+CREATE TYPE "public"."artefact_kind" AS ENUM('mesh', 'production_spec', 'validation_report', 'checksum_manifest', 'render_front', 'render_side', 'render_three_quarter', 'design_snapshot', 'heightmap_metadata');--> statement-breakpoint
+ALTER TABLE "product_artefacts" ADD COLUMN "kind" "artefact_kind" NOT NULL;

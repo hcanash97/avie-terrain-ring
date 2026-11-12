@@ -80,3 +80,7 @@ Latest external review: joins first, then proportions, then presentation. Keep t
 - Geometry code is pure and unit-tested. Add a test with every shape rule.
 - Judge shape changes in clay (`#blank`) with fixed cameras before changing materials. `scripts/capture.js` and `scripts/look.js` run in the dev page; `scripts/look-stats.mjs` measures clipping and crushed blacks.
 - `captures/` is not in the repository: it's regenerable output.
+
+## Product-family foundation
+
+The new workspace packages implement reusable terrain/configuration snapshots, a nine-product registry, provisional mount constraints and a local Drizzle/PostgreSQL schema. The existing ring app remains in `terrain-ring/`. See [Milestone 1 guide](docs/product-family-foundation.md) for commands, tests and current limitations. Pendant/Signet geometry, live APIs and production exports are later milestones.
