@@ -5,11 +5,8 @@ import { useTerrainStore } from "../state/terrainStore";
 import { useRingStore } from "../state/ringStore";
 import { facePreset } from "../geometry/ring-blank";
 
-const EARTH_M = 40075016.686;
+import { metresPerPixel, zoomForFrame } from "../geometry/map-scale";
 const FRAME_FRACTION = 0.62; // frame width as a share of the map width
-
-const metresPerPixel = (lat: number, zoom: number) =>
-  (EARTH_M * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** zoom);
 
 const LAYERS = {
   map: () => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -30,6 +27,7 @@ const LAYERS = {
 export function MapPicker() {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const programmatic = useRef(false);
   const layerRef = useRef<L.TileLayer | null>(null);
   const tilesFailed = useTerrainStore((s) => s.mapFailed);
   const setTilesFailed = (mapFailed: boolean) => useTerrainStore.getState().set({ mapFailed });
@@ -41,13 +39,14 @@ export function MapPicker() {
 
   const frameWidthPx = () => (mapEl.current?.clientWidth ?? 400) * FRAME_FRACTION;
   const zoomFor = (lat: number, lengthM: number) =>
-    Math.log2((EARTH_M * Math.cos((lat * Math.PI) / 180)) / (256 * (lengthM / frameWidthPx())));
+    zoomForFrame(lat, lengthM, frameWidthPx());
 
   useEffect(() => {
     if (!mapEl.current) return;
-    const map = L.map(mapEl.current, { zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: true });
+    const map = L.map(mapEl.current, { zoomSnap: 0, zoomDelta: 0.5, attributionControl: true, trackResize: false });
     map.setView([place.lat, place.lon], zoomFor(place.lat, place.lengthM));
     map.on("moveend", () => {
+      if (programmatic.current) return;
       const c = map.getCenter();
       const lengthM = frameWidthPx() * metresPerPixel(c.lat, map.getZoom());
       const current = useTerrainStore.getState().place;
@@ -57,7 +56,20 @@ export function MapPicker() {
       set({ place: { name: moved > current.lengthM * 0.5 ? "Custom area" : current.name, lat: c.lat, lon: c.lng, lengthM } });
     });
     mapRef.current = map;
+    // Layout resizing must retain geographic extent instead of sampling a
+    // different landscape at the old pixel zoom. Own resize handling avoids
+    // Leaflet emitting a user-like moveend before the frame is recalibrated.
+    const observer = new ResizeObserver(() => {
+      const current = useTerrainStore.getState().place;
+      programmatic.current = true;
+      try {
+        map.invalidateSize({ pan: false });
+        map.setView([current.lat, current.lon], zoomFor(current.lat, current.lengthM), { animate: false });
+      } finally { programmatic.current = false; }
+    });
+    observer.observe(mapEl.current);
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -73,7 +85,9 @@ export function MapPicker() {
     const lengthNow = frameWidthPx() * metresPerPixel(c.lat, map.getZoom());
     const moved = Math.hypot(c.lat - place.lat, c.lng - place.lon) * 111000;
     if (moved > place.lengthM * 0.01 || Math.abs(lengthNow - place.lengthM) / place.lengthM > 0.01) {
-      map.setView([place.lat, place.lon], zoomFor(place.lat, place.lengthM), { animate: false });
+      programmatic.current = true;
+      try { map.setView([place.lat, place.lon], zoomFor(place.lat, place.lengthM), { animate: false }); }
+      finally { programmatic.current = false; }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place]);

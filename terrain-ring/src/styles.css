@@ -201,3 +201,36 @@ details.refine > div { margin-top: 14px; }
 
 .origin-tag { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--avie-gold); color: var(--ink); font-size: 0.7rem; letter-spacing: 0.04em; }
 .quote-line { font-family: var(--font-ui); font-size: 0.78rem; color: var(--muted); }
+
+/* Terra: measured metadata space, deliberate navigation and quiet controls. */
+.viewer { top: var(--viewer-top, 140px); bottom: var(--viewer-bottom, 120px); }
+.stage-foot { bottom: 76px; max-width: 54ch; font-size: 0.75rem; }
+.view-bar { left: 24px; right: 24px; bottom: 18px; justify-content: flex-end; flex-wrap: wrap; gap: 5px; }
+.view-bar button { min-height: 40px; min-width: 40px; padding: 6px 10px; }
+.stepper { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
+.stepper li button { min-height: 60px; position: relative; padding: 10px 7px 7px; border: 1px solid var(--line); background: var(--surface); gap: 2px; font-size: 0.75rem; line-height: 1.2; transition: background 150ms ease, border-color 150ms ease; }
+.stepper li button:hover { border-color: var(--avie-green); }
+.stepper li.current button { background: var(--avie-green); color: var(--on-green); border-color: var(--avie-green); }
+.stepper .bar { position: absolute; left: -1px; right: -1px; top: -1px; }
+.step-number { font-size: 0.68rem; opacity: .7; }
+.stepper-note { font-size: .7rem; }
+.step-body > .stack { animation: terra-step 180ms ease-out; }
+.dev-inspection { position: absolute; bottom: 122px; left: 24px; z-index: 4; font: 12px var(--font-ui); background: var(--surface); border: 1px solid var(--line); padding: 5px 9px; }
+.dev-inspection summary { cursor: pointer; }
+.dev-inspection label { display: block; padding: 5px 0; }
+@keyframes terra-step { from { opacity: .7; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 860px) {
+  .configurator { grid-template-rows: minmax(540px, 68svh) auto; }
+  .stage { min-height: 540px; }
+  .stage-foot { left: 16px; right: 16px; bottom: 116px; }
+  .view-bar { left: 16px; right: 16px; bottom: 12px; justify-content: center; }
+  .dev-inspection { bottom: 165px; left: 16px; }
+  .stepper { grid-template-columns: 1fr; padding: 10px 12px; }
+  .stepper li button { font-size: .72rem; gap: 2px; min-height: 54px; padding: 9px 5px 6px; }
+  .stepper .btn-primary { min-height: 44px; padding: 8px 16px; }
+  .stepper-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .step-body > .stack { animation: none; } .stepper li button { transition: none; } }
+
+/* Reserve actual wrapped camera controls and caption space at every viewport. */
+.stage-foot { bottom: var(--toolbar-space, 116px); }

@@ -7,6 +7,9 @@ export function createControls(camera: THREE.PerspectiveCamera, domElement: HTML
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.enablePan = false;
+  // Page scrolling over the product must not silently zoom into the metal.
+  // Deliberate zoom buttons are provided alongside the fixed camera views.
+  controls.enableZoom = false;
   controls.minDistance = 16;
   controls.maxDistance = 90;
   controls.update();

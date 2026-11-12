@@ -1,0 +1,13 @@
+{
+  "name": "@avie/geometry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./terrain-ring": "./src/products/terrain-ring/index.ts"
+  },
+  "dependencies": {
+    "@avie/terrain": "*"
+  }
+}

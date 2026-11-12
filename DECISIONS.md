@@ -1,3 +1,5 @@
+> Current implementation: see [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md). Its Terra dimensions, collar behaviour and validation status supersede conflicting historical guidance below.
+
 # Product decisions
 
 Decided by À Vie on 12 November 2026, in response to the reference reconciliation notes.
@@ -15,3 +17,7 @@ Decided by À Vie on 12 November 2026, in response to the reference reconciliati
 - **Lead time, resizing, delivery, certification and hallmarking commitments.** Nothing is promised in the build until these are decided. "Free UK delivery" and "hand finished" were removed for this reason.
 - **Pricing model detail.** Currently "priced by written quote". Decide whether live prices appear in the configurator (Phase 14).
 - **Proposed brand fonts and palettes in the research.** Not adopted. The build uses the live aviediamonds.com tokens (Trirong, #3F5147, #EFECEC, #252525, #CDA349) plus Inter for compact controls.
+
+## Latest user direction — Terra ring
+
+See TERRA_AUDIT_AND_PLAN.md for the audit and delivery sequence. Rename the customer product to **À Vie Terra Ring**. Face sizes should primarily drive lateral width rather than automatic added thickness. Reduce unnecessary head metal; blend selected terrain into the upper shoulders with landscape-dependent veins. All shoulder styles, including Straight, should join smoothly. Keep the working map. Enlarge bottom step navigation. Resolve the persistent black-render state before further material tuning. Pendants with an integrated chain bail are the next product phase after ring stability. These are planned changes, not a claim they are already implemented.

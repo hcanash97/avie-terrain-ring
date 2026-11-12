@@ -48,7 +48,7 @@ export function StepLandscape({ exaggeration }: { exaggeration: number | null })
             ]}
             onChange={(detail) => { terrain.set({ detail }); track("detail_changed", { detail }); }}
           />
-          <p className="hint">Fine detail shows every ridge; softer detail wears more smoothly over the years.</p>
+          <p className="hint">Fine preserves more of the available elevation detail; Soft smooths smaller features. Casting and polishing may soften the result.</p>
         </div>
       </details>
     </div>

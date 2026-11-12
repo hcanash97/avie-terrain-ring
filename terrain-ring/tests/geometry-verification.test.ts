@@ -64,16 +64,17 @@ describe("inner dimensions", () => {
 });
 
 describe("terrain perimeter and shading", () => {
-  it("terrain stays on the head: the end wall is vertical and the shoulder never overhangs it", () => {
+  it("terrain continues beyond the face without invading the finger opening", () => {
     for (const shoulder of ["straight", "classic", "curved"] as ShoulderStyle[]) {
       const { mesh } = build("bold", shoulder, "classic", SLOPE, 1);
       const P = mesh.positions;
-      const half = WEIGHTS.bold.faceLengthMm / 2;
-      // Any outer point above table height must lie within the face footprint.
       const yTop = getInnerDiameterMm("N") / 2 + WEIGHTS.bold.headHeightMm;
+      let continued = false;
       for (let i = 0; i < P.length; i += 3) {
-        if (P[i + 1]! > yTop + 1e-6) expect(Math.abs(P[i]!)).toBeLessThanOrEqual(half + 1e-6);
+        expect(Math.hypot(P[i]!, P[i + 1]!)).toBeGreaterThanOrEqual(getInnerDiameterMm("N") / 2 - 1e-5);
+        if (Math.abs(P[i]!) > WEIGHTS.bold.faceLengthMm / 2 + 0.05 && P[i + 1]! > yTop) continued = true;
       }
+      expect(continued).toBe(true);
     }
   });
 

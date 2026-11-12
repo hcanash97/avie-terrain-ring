@@ -1,16 +1,21 @@
-# À Vie Terrain Ring: configurator prototype
+# À Vie Terra Ring: configurator prototype
 
 A browser configurator for À Vie Diamonds that turns real elevation data into a made-to-order landscape signet ring. The customer chooses a place on a map; its terrain becomes the ring's face. They then choose head shape, face size, metal, finish, shoulders, band profile and size. The 3D preview is generated live.
 
-**Shared preview (Claude-hosted; live map blocked there, presets work):** https://claude.ai/artifact/CGRQ13s5c5kgj6JMji3ojB
+**Current private online preview (phone/desktop):** https://avie-terra-ring-preview.aware-swift-8528.chatgpt.site
+
+Sign in with the ChatGPT account that owns this Site. Hosting is independent of the laptop. See [hosting notes](docs/hosting.md) for updates.
+
+**Historical preview (Claude-hosted; live map blocked there, presets work):** https://claude.ai/artifact/CGRQ13s5c5kgj6JMji3ojB
 
 ## Run it
 
 ```bash
+npm ci             # shared workspace dependencies, from the repository root
 cd terrain-ring
-npm install
+npm ci
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
-npm test           # 185 geometry, terrain and material tests
+npm test           # 396 geometry, terrain, map and material tests
 npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
 node scripts/make-artifact.mjs   # single-page bundle in terrain-ring/artifact for Claude artifacts
 node scripts/bake-terrain.mjs    # re-bake saved terrain for the preset places
@@ -50,6 +55,12 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 - **Copy:** calm and quote-based ("nothing is made until you approve it"). Don't add delivery, lead-time or certification promises until À Vie confirms them.
 
 ## Current state (12 Nov 2026) and next steps, in priority order
+
+**Latest reference-photo pass:** [Shape refinement and remaining gaps](docs/shape-refinement.md). Includes the Detail camera and dev-only controlled comparison sheet.
+
+**Implemented Terra refinement:** read [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md) for current dimensions, validation, rendering recovery and remaining manufacturing work. The older round notes below are historical and are superseded by that report.
+
+**Latest direction:** see [Terra audit and implementation plan](TERRA_AUDIT_AND_PLAN.md). The user now requests reduced substrate metal, width-led shoulder scaling, landscape-dependent shoulder veins, rendering-state recovery and the Terra name. This plan supersedes the older ordering and face-only terrain guidance below.
 Latest external review: joins first, then proportions, then presentation. Keep the feature set fixed until the joins look clean.
 
 1. **Done this round:**
@@ -57,7 +68,7 @@ Latest external review: joins first, then proportions, then presentation. Keep t
    - The far-side nub is gone.
    - Outer-surface columns cluster at the edges, so edge rounding is resolved.
    - Shoulders leave the head less vertically.
-2. **Still open: faint vertical line at each head corner (¾ view).** Measured cause: the outer edge rounding always ends vertical, but in the shoulder zone the side wall below it slopes because of the taper, giving a 40–60° kink. Fix: end the edge rounding tangent to the actual wall slope for each cross-section. Do not hide it by raising `CREASE_ANGLE_DEG`. Two attempts that made it worse: a fast radius ramp under the corner (pinched) and a mid-shoulder radius swell (moved the line).
+2. **Fixed: head-corner edge/wall tangent.** The edge round follows the actual side-wall direction and width field, and outer/side-wall samples cluster at the join. Crease-normal threshold unchanged. Six geometric tangent regressions cover both head shapes and all shoulder styles; they fail on the previous generator. Checked Bar and Cushion in clay from fixed cameras. Continue with head bulk next.
 3. **Head bulk:** compare the Bar side elevation with the reference photos; consider a lower `headHeightMm` and a shorter vertical wall.
 4. **Soft or "liquid" terrain:** separate the causes before changing anything: elevation resolution (saved presets are about 38 m/px; live tiles are finer), smoothing (`DETAIL`), normals, and reflections. Don't turn sharpening back on.
 5. **Default camera:** raise it slightly so the landscape is visible immediately (`src/three/camera.ts`, `VIEWS` in `scene.ts`).
@@ -70,3 +81,11 @@ Latest external review: joins first, then proportions, then presentation. Keep t
 - Geometry code is pure and unit-tested. Add a test with every shape rule.
 - Judge shape changes in clay (`#blank`) with fixed cameras before changing materials. `scripts/capture.js` and `scripts/look.js` run in the dev page; `scripts/look-stats.mjs` measures clipping and crushed blacks.
 - `captures/` is not in the repository: it's regenerable output.
+
+## Product-family foundation
+
+The new workspace packages implement reusable terrain/configuration snapshots, a nine-product registry, provisional mount constraints and a local Drizzle/PostgreSQL schema. The existing ring app remains in `terrain-ring/`. See [Milestone 1 guide](docs/product-family-foundation.md) for commands, tests and current limitations. Pendant/Signet geometry, live APIs and production exports are later milestones.
+
+## Shared terrain engine (Milestone 2)
+
+Terrain processing and the ring generator now live in `packages/terrain` and `packages/geometry`. The viewer uses an adapter, with frozen 486-case regression coverage against the original engine. See [shared engine guide](docs/shared-terrain-engine.md). Clone/build the complete repository; production `terrain-ring/dist` is still standalone.

@@ -31,7 +31,7 @@ export function Configurator() {
   const terrainOrigin = useTerrainStore((s) => s.terrainOrigin);
   const setTerrain = useTerrainStore((s) => s.set);
   const { metal, weight, headShape } = useRingStore();
-  const webgl = isWebGLAvailable();
+  const [webgl] = useState(isWebGLAvailable);
 
   // Refetch elevation only once the map has settled.
   const area = useDebouncedValue(place, 400);
@@ -74,7 +74,7 @@ export function Configurator() {
           <img src={logo} alt="À Vie Diamonds" />
           <span className="brand-name">
             À Vie Diamonds
-            <small>Terrain Ring</small>
+            <small>Terra Ring</small>
           </span>
         </a>
         <nav className="topbar-links" aria-label="À Vie Diamonds">
@@ -97,6 +97,7 @@ export function Configurator() {
               )}
             </p>
             <p className="quote-line">Priced by written quote · nothing is made until you approve it</p>
+            {stats?.terrainAdjusted && <p className="hint">Steep edge detail has been softened where the terrain meets the shoulders.</p>}
           </div>
           {webgl ? (
             source && <RingViewer source={source} onStats={setStats} />
@@ -128,9 +129,9 @@ export function Configurator() {
               <ol>
                 {STEPS.map((name, i) => (
                   <li key={name} className={i < step ? "done" : i === step ? "current" : ""}>
-                    <button onClick={() => setStep(i)} aria-label={`Step ${i + 1}: ${name}`}>
-                      <span className="bar" />
-                      {name}
+                    <button onClick={() => setStep(i)} aria-label={`Step ${i + 1}: ${name}`} aria-current={i === step ? "step" : undefined}>
+                      <span className="bar" aria-hidden="true" />
+                      <span className="step-number">{String(i + 1).padStart(2, "0")}</span><span>{name}</span>
                     </button>
                   </li>
                 ))}
@@ -142,11 +143,11 @@ export function Configurator() {
               onClick={() => {
                 if (last) {
                   setCartMessage(true);
-                  track("add_to_cart_clicked");
+                  track("quote_next_steps_viewed");
                 } else setStep(step + 1);
               }}
             >
-              {last ? "Add to cart" : "Continue"}
+              {last ? "Next steps" : "Continue"}
             </button>
           </footer>
         </aside>

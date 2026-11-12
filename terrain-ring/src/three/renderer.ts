@@ -15,11 +15,18 @@ export function createRenderer(container: HTMLElement, pixelRatioCap: number) {
   return renderer;
 }
 
+let webglAvailable: boolean | undefined;
 export function isWebGLAvailable(): boolean {
+  if (webglAvailable !== undefined) return webglAvailable;
   try {
     const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    const context = canvas.getContext("webgl2");
+    webglAvailable = !!context;
+    // Probing on every React render leaked disposable GPU contexts. Enough
+    // option changes can evict the real preview's context on limited devices.
+    context?.getExtension("WEBGL_lose_context")?.loseContext();
+    return webglAvailable;
   } catch {
-    return false;
+    return (webglAvailable = false);
   }
 }
