@@ -450,6 +450,36 @@ export function createRingMesh(p: RingParameters): RingMesh {
     return result;
   };
 
+  /** Where a row's outer surface sits in side profile, before edge rounding and terrain. */
+  const nominalXY = (row: Row, z: number, h: number): [number, number] => {
+    if (row.kind === "face") return [row.x, yTop];
+    if (row.kind === "wall") return [(row.side * L) / 2, yTop];
+    if (row.kind === "shoulder") return shoulderXY(row.side, row.t, z, h);
+    const r = bandOuterRadius(z);
+    return [-r * Math.sin(row.alpha), r * Math.cos(row.alpha)];
+  };
+  /**
+   * Edge-round pull direction (unit, side profile): the surface's inward normal.
+   * Straight down on the flat table (face and end wall), radial on the band,
+   * blended along the shoulder (which leaves the head horizontally). A radial
+   * pull on the table moved edge points sideways in plan; at the plan corners,
+   * where the footprint turns through 90°, that changed the head width by up
+   * to ~0.5 mm between neighbouring rows and folded the surface.
+   */
+  const pullDirection = (row: Row, x: number, y: number, z: number): [number, number] => {
+    const innerH = innerHalfWidth(row);
+    const innerR = innerRadius(Math.sign(z) * innerH, innerH);
+    const rx = -innerR * Math.sin(row.alpha) - x;
+    const ry = innerR * Math.cos(row.alpha) - y;
+    const rl = Math.hypot(rx, ry);
+    const k =
+      row.kind === "band" ? 1 : row.kind === "shoulder" ? smootherstep(row.t) : 0;
+    const dx = (rx / rl) * k;
+    const dy = (ry / rl) * k - (1 - k);
+    const length = Math.hypot(dx, dy);
+    return [dx / length, dy / length];
+  };
+
   /** Outer surface point. withTerrain=false gives the bare head (side-wall subdivision). */
   const outerPoint = (row: Row, z: number, withTerrain: boolean): Vec3 => {
     const h = halfWidth(row);
@@ -463,16 +493,8 @@ export function createRingMesh(p: RingParameters): RingMesh {
      * by the sloping wall (the visible line at each head corner).
      */
     const rounded = (x: number, y: number): Vec3 => {
-      const innerH = innerHalfWidth(row);
-      const innerR = innerRadius(Math.sign(z) * innerH, innerH);
-      const dx = -innerR * Math.sin(row.alpha) - x;
-      const dy = innerR * Math.cos(row.alpha) - y;
-      const length = Math.hypot(dx, dy);
-      const point: Vec3 = [
-        x + (pull * dx) / length,
-        y + (pull * dy) / length,
-        z,
-      ];
+      const [dx, dy] = pullDirection(row, x, y, z);
+      const point: Vec3 = [x + pull * dx, y + pull * dy, z];
       const radius = Math.min(edgeRadius(row), h * 0.4);
       const progress = radius > 0 ? (Math.abs(z) - (h - radius)) / radius : 0;
       point[2] +=
@@ -482,15 +504,15 @@ export function createRingMesh(p: RingParameters): RingMesh {
       return point;
     };
     switch (row.kind) {
-      case "face": {
-        const lift = withTerrain ? terrainLift(row.x, z) : 0;
-        const point = rounded(row.x, yTop);
-        point[1] += lift;
-        return point;
-      }
+      // Terrain is sampled where the (rounded) point actually sits, not at the
+      // row's nominal position. Near the plan corners the edge round moves
+      // points inward by more than the row spacing; lifting them by the
+      // nominal row's height folded the surface over itself. A lift that is a
+      // function of the point's own plan position (x, z) cannot fold it.
+      case "face":
       case "wall": {
-        const point = rounded((row.side * L) / 2, yTop);
-        if (withTerrain) point[1] += shoulderTerrain(row, z, h).lift;
+        const point = rounded(row.kind === "face" ? row.x : (row.side * L) / 2, yTop);
+        if (withTerrain) point[1] += terrainLift(point[0], point[2]);
         return point;
       }
       case "shoulder": {
@@ -668,8 +690,20 @@ export function createRingMesh(p: RingParameters): RingMesh {
           return outerPoint(row, side * halfWidth(row), true);
         // Resolve the wall tangent just below the round without adding vertices.
         const f = 1 - (1 - k / (wallColumns - 2)) ** 3;
-        const x = inner[0] + (bare[0] - inner[0]) * f;
-        const y = inner[1] + (bare[1] - inner[1]) * f;
+        // Leave the round along its own pull direction, so the round and the
+        // wall share a tangent. On the band the pull points at the inner edge
+        // and this is exactly the straight wall.
+        const h = halfWidth(row);
+        const [nx, ny] = nominalXY(row, side * h, h);
+        const [dx, dy] = pullDirection(row, nx, ny, side * h);
+        const reach = Math.hypot(inner[0] - bare[0], inner[1] - bare[1]) / 2;
+        const cx = bare[0] + dx * reach,
+          cy = bare[1] + dy * reach;
+        const a = (1 - f) * (1 - f),
+          b = 2 * f * (1 - f),
+          c = f * f;
+        const x = a * inner[0] + b * cx + c * bare[0];
+        const y = a * inner[1] + b * cy + c * bare[1];
         return [x, y, side * widthAt(x, y, row)];
       },
       side === 1,
@@ -683,9 +717,33 @@ export function createRingMesh(p: RingParameters): RingMesh {
     );
   }
 
+  // Surface labels for validation (no effect on geometry): 0 body, 1 terrain
+  // relief, 2 inner (finger), 3 terrain rim (the edge round and the strip of
+  // side wall that rises to the terrain). Inner-surface vertices occupy one
+  // contiguous block straight after the outer surface; side walls follow.
+  const innerStart = n * outerColumns,
+    innerEnd = innerStart + n * innerColumns;
+  const allIndices = [...faceIndices, ...indices];
+  const surfaceLabels = new Uint8Array(allIndices.length / 3);
+  // Outer-surface vertices inside the designed edge round, where terrain meets the rim.
+  const inRound = new Uint8Array(innerStart);
+  rows.forEach((row, r) => {
+    const h = halfWidth(row);
+    const radius = Math.min(edgeRadius(row), h * 0.4);
+    for (let k = 0; k < outerColumns; k++)
+      if (Math.abs(zAt(row, k, outerColumns)) > h - radius - 1e-9) inRound[r * outerColumns + k] = 1;
+  });
+  for (let t = 0; t < surfaceLabels.length; t++) {
+    const v = [allIndices[t * 3]!, allIndices[t * 3 + 1]!, allIndices[t * 3 + 2]!];
+    if (v.every((i) => i >= innerStart && i < innerEnd)) surfaceLabels[t] = 2;
+    else if (v.some((i) => terrainBlends[i]! > 1e-3))
+      surfaceLabels[t] = v.some((i) => i >= innerEnd || inRound[i] === 1) ? 3 : 1;
+  }
+
   return {
+    surfaceLabels,
     positions: new Float32Array(positions),
-    indices: new Uint32Array([...faceIndices, ...indices]),
+    indices: new Uint32Array(allIndices),
     shade: new Float32Array(shades),
     terrainBlend: new Float32Array(terrainBlends),
     terrainAdapted,

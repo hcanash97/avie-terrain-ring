@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./terrain-ring": "./src/products/terrain-ring/index.ts"
+    "./terrain-ring": "./src/products/terrain-ring/index.ts",
+    "./validation": "./src/validation/index.ts"
   },
   "dependencies": {
     "@avie/terrain": "*"

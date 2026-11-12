@@ -11,8 +11,8 @@ it("preserves pre-extraction terrain and ring buffers exactly across 486 cases",
   const variants = Array.from(cases());
   expect(variants).toHaveLength(486);
   expect(Object.keys(baseline.cases)).toHaveLength(variants.length);
-  // Re-recorded after the intentional slim-profile change (thinner band and substrate).
-  expect(baseline.sourceCommit).toBe("slim-profile");
+  // Re-recorded after the intentional head-corner fold fix (edge round pulled along the surface normal).
+  expect(baseline.sourceCommit).toBe("head-corner-fold");
   for (const c of variants)
     expect(measure(c), c.key).toEqual(baseline.cases[c.key]);
 }, 60000);
