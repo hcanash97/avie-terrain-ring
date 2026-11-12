@@ -88,12 +88,18 @@ The brief's 15 questions stand. Send them with the first review-only package fro
   - Renders are passed in from the configurator's fixed-camera capture, not generated headless.
 
 ### Findings from the first runs
-1. **Self-intersections at a head corner** when the terrain is high at the face edge:
-   - Affected: Standard and Bold bar, cushion, Snowdon and Ben Nevis at 70% height. Typically 5 crossing triangle pairs near (±6.4, 9.8, ±3.6) mm on Standard.
-   - Not affected: near-flat terrain, the Slim face, the Matterhorn frame.
-   - Cause (to confirm): the terrain edge carried into the shoulder folds over the plan-corner rounding.
-   - These packages correctly fail validation. **Fix before sending any affected configuration.**
+1. **Self-intersections at the head's plan corners: fixed 12 Nov** (`fix/head-corner-fold`).
+   - Symptom: with high terrain at the face edge, the top surface folded over itself near the corners. Seen on Standard and Bold bar and on cushion, Snowdon and Ben Nevis, at 70% height, and at more configurations at size H and full height.
+   - Cause: the edge round pulled points toward the ring's centre, which also moved them sideways in plan. At a plan corner the footprint turns through 90°, so a move of hundredths of a millimetre changed the head's width by up to 0.5 mm between neighbouring rows. Terrain was also sampled at the row's nominal position rather than where the point really sat.
+   - Fix:
+     - The round pulls along the surface's inward normal: straight down on the table, radial on the band, blended along the shoulder.
+     - The side wall leaves the round along the same direction, so there is no new crease.
+     - Terrain is sampled at each point's true plan position.
+   - Effect: 99% of vertices move under 0.25 mm (largest 0.81 mm, at cushion corners). There are no self-intersections in an 82-configuration sweep (7 places, both shapes, 3 face sizes, 3 shoulders, sizes H/N/Z, 70% and 100% height). A regression test guards it.
 2. **Thin regions:**
    - The 1st-percentile wall is about 0.65–0.75 mm (Slim sample 0.653 mm; 2.5% of the sampled surface under 0.8 mm).
    - The measured minimum (0.04 mm on the sample) is a single point at an edge round or crease. Ray-cast thickness exaggerates thinness at tight convex edges.
    - These numbers go to the manufacturer with question 2, before any minimum is set.
+3. **Very thin spots on canyon and valley terrain:**
+   - Grand Canyon and Lake District at full height have a 1st-percentile wall of 0.1–0.3 mm, against about 0.65 mm elsewhere. No crossings.
+   - Likely cause: deep valleys cutting close to the inner surface, plus sharp ridges. To investigate next (a minimum floor under the terrain, or a relief cap for these places).
