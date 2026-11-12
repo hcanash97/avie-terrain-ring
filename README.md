@@ -50,6 +50,8 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 - **Copy:** calm and quote-based ("nothing is made until you approve it"). Don't add delivery, lead-time or certification promises until À Vie confirms them.
 
 ## Current state (12 Nov 2026) and next steps, in priority order
+
+**Latest direction:** see [Terra audit and implementation plan](TERRA_AUDIT_AND_PLAN.md). The user now requests reduced substrate metal, width-led shoulder scaling, landscape-dependent shoulder veins, rendering-state recovery and the Terra name. This plan supersedes the older ordering and face-only terrain guidance below.
 Latest external review: joins first, then proportions, then presentation. Keep the feature set fixed until the joins look clean.
 
 1. **Done this round:**
