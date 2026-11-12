@@ -3,7 +3,7 @@
  *
  *   npm run package -- --place "Snowdon, GB" --shape bar --face standard --size N \
  *     --metal gold_9ct --finish polished [--height 0.7] [--detail high] [--bearing 0] \
- *     [--shoulder classic] [--profile classic] [--min-wall 1.0] [--renders <dir>] \
+ *     [--shoulder classic] [--profile classic] [--min-wall <mm>] [--min-feature <mm>] [--min-rim-angle <deg>] [--renders <dir>] \
  *     [--order SAMPLE-001] [--out production-packages]
  */
 import { execSync } from "node:child_process";
@@ -37,6 +37,8 @@ const config: RingConfiguration = {
   finish: arg("finish", "polished") as RingConfiguration["finish"]
 };
 const minWall = arg("min-wall");
+const minFeature = arg("min-feature");
+const minRimAngle = arg("min-rim-angle");
 
 const started = Date.now();
 const result = await buildRingPackage({
@@ -45,11 +47,17 @@ const result = await buildRingPackage({
   outDir: arg("out", "production-packages")!,
   geometryVersion,
   minWallMm: minWall === undefined ? null : Number(minWall),
+  minFeatureMm: minFeature === undefined ? null : Number(minFeature),
+  minRimAngleDeg: minRimAngle === undefined ? null : Number(minRimAngle),
   rendersDir: arg("renders")
 });
 const wall = result.report.checks.minimumWallThickness?.measured as Record<string, number> | undefined;
 console.log(`Package: ${result.root}`);
 console.log(`Status: ${result.spec.status} (validation: ${result.report.status}; reopen checks ${result.reopenOk ? "passed" : "FAILED"})`);
 console.log(`Errors: ${result.report.errors.map((e) => e.code).join(", ") || "none"}`);
-if (wall) console.log(`Wall thickness: min ${wall.minMm} mm, 1st percentile ${wall.p1Mm} mm, median ${wall.medianMm} mm`);
+const feature = result.report.checks.minimumFeatureSize?.measured as Record<string, number> | undefined;
+const rim = result.report.checks.minimumRimAngle?.measured as Record<string, number> | undefined;
+if (wall) console.log(`Structural wall (to the finger): min ${wall.minMm} mm, 1st percentile ${wall.p1Mm} mm, median ${wall.medianMm} mm`);
+if (feature) console.log(`Terrain feature size (sphere): min ${feature.minMm} mm, 1st percentile ${feature.p1Mm} mm, median ${feature.medianMm} mm`);
+if (rim) console.log(`Rim angle: min ${rim.minDeg}°, ${rim.percentBelow45Deg}% of the rim below 45°`);
 console.log(`Mass: ${result.spec.estimatedMassG} g ${config.metal}; ${((Date.now() - started) / 1000).toFixed(1)} s`);

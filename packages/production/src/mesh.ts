@@ -3,7 +3,12 @@
  * The preview generator emits separate surface strips that share positions but
  * not indices; production output welds them into one indexed shell first.
  */
-export type IndexedMesh = { positions: Float32Array; indices: Uint32Array };
+export type IndexedMesh = {
+  positions: Float32Array;
+  indices: Uint32Array;
+  /** Optional per-triangle surface labels (validation only); kept in step with `indices`. */
+  surfaceLabels?: Uint8Array;
+};
 
 /** Merge vertices that coincide within `toleranceMm`, and drop triangles that collapse. */
 export function weld(mesh: IndexedMesh, toleranceMm = 1e-5): IndexedMesh {
@@ -23,11 +28,19 @@ export function weld(mesh: IndexedMesh, toleranceMm = 1e-5): IndexedMesh {
     remap[i] = j;
   }
   const tris: number[] = [];
+  const labels: number[] = [];
   for (let t = 0; t < I.length; t += 3) {
     const a = remap[I[t]!]!, b = remap[I[t + 1]!]!, c = remap[I[t + 2]!]!;
-    if (a !== b && b !== c && a !== c) tris.push(a, b, c);
+    if (a !== b && b !== c && a !== c) {
+      tris.push(a, b, c);
+      if (mesh.surfaceLabels) labels.push(mesh.surfaceLabels[t / 3]!);
+    }
   }
-  return { positions: new Float32Array(out), indices: new Uint32Array(tris) };
+  return {
+    positions: new Float32Array(out),
+    indices: new Uint32Array(tris),
+    ...(mesh.surfaceLabels ? { surfaceLabels: new Uint8Array(labels) } : {})
+  };
 }
 
 export function boundingBox(mesh: IndexedMesh) {

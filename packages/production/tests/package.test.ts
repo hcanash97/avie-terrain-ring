@@ -78,5 +78,16 @@ describe("review-only ring package", () => {
     expect(a.spec.units).toBe("millimetres");
     expect(a.report.constraintProfile.approved).toBe(false);
     expect(a.spec.notGenerated.join(" ")).toMatch(/production-spec\.pdf/);
+
+    // Thickness is reported by meaning, each with its method, and nothing is judged without a minimum.
+    const written = JSON.parse(readFileSync(join(a.root, "02_specification/validation-report.json"), "utf8"));
+    for (const name of ["minimumWallThickness", "minimumFeatureSize", "minimumRimAngle", "edgeRayThickness"]) {
+      expect(written.checks[name].status, name).toBe("not_run");
+      expect(written.checks[name].method, name).toBeTruthy();
+      expect(written.checks[name].measured, name).toBeDefined();
+    }
+    expect(written.distributions.structuralWall.percentBelow).toBeDefined();
+    expect(written.distributions.terrainFeatureSize.percentBelow).toBeDefined();
+    expect(written.limitations.join(" ")).toMatch(/casting/);
   }, 120000);
 });

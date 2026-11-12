@@ -9,4 +9,11 @@ export type TerrainProductMesh = {
   /** Continuous terrain-finish weight, fading into polished shoulders. */
   terrainBlend: Float32Array;
   terrainAdapted: boolean;
+  /**
+   * One label per triangle, in `indices` order, for validation: 0 body,
+   * 1 terrain relief (including the collar blending into the shoulders),
+   * 2 inner (finger or back) surface, 3 terrain rim (edge round and the wall
+   * strip rising to the terrain). Matches validation's SURFACE values.
+   */
+  surfaceLabels?: Uint8Array;
 };

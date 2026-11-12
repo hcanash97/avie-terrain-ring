@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { validateMesh, type ConstraintProfile, type Mesh } from "../src/validation/common";
+import { SURFACE, validateMesh, type ConstraintProfile, type Mesh } from "../src/validation/common";
+import { rimAngleCheck } from "../src/validation/ring";
 
 /** Closed, outward-wound box from (0,0,0) to (sx,sy,sz), 12 triangles. */
 function box(sx: number, sy: number, sz: number, offset: [number, number, number] = [0, 0, 0], base = 0) {
@@ -77,5 +78,80 @@ describe("mesh validation", () => {
   it("fails relief over the product maximum", () => {
     const r = validateMesh(mesh(box(10, 10, 10)), { productType: "test", profile, densityGcm3: 10, reliefMm: 3.5 });
     expect(r.errors.map((e) => e.code)).toContain("MAXIMUM_RELIEF");
+  });
+});
+
+/**
+ * Box triangles in order: 0–1 z=0, 2–3 z=sz, 4–5 y=0, 6–7 x=sx, 8–9 y=sy, 10–11 x=0.
+ * Label the y=0 face as the inner (finger) surface and every other face as terrain.
+ */
+const fingerBelow = () => Uint8Array.from({ length: 12 }, (_, t) => (t === 4 || t === 5 ? SURFACE.inner : SURFACE.terrain));
+const labelled = (m: Mesh, p: ConstraintProfile) =>
+  validateMesh(m, { productType: "test", profile: p, densityGcm3: 10, surfaceLabels: fingerBelow() });
+
+describe("thickness split by surface", () => {
+  it("a narrow fin on solid metal fails feature size, not structural wall", () => {
+    // 0.25 mm wide, 3 mm tall: plenty of metal above the finger, but a knife-thin feature.
+    const r = labelled(mesh(box(0.25, 3, 6)), { ...profile, minWallMm: 1.0, minFeatureMm: 0.5 });
+    expect(r.wall.p1Mm).toBeCloseTo(3, 3);
+    expect(r.feature!.p1Mm).toBeLessThan(0.26);
+    const codes = r.errors.map((e) => e.code);
+    expect(codes).toContain("MINIMUM_FEATURE_SIZE");
+    expect(codes).not.toContain("MINIMUM_WALL_THICKNESS");
+  });
+
+  it("a thin slab over the finger fails structural wall", () => {
+    const r = labelled(mesh(box(10, 0.3, 10)), { ...profile, minWallMm: 1.0 });
+    expect(r.wall.p1Mm).toBeCloseTo(0.3, 3);
+    expect(r.errors.map((e) => e.code)).toContain("MINIMUM_WALL_THICKNESS");
+  });
+
+  it("broad terrain reads as wide features", () => {
+    const r = labelled(mesh(box(6, 3, 6)), { ...profile, minFeatureMm: 0.5 });
+    expect(r.feature!.minMm).toBeGreaterThan(0.5);
+    expect(r.errors).toEqual([]);
+  });
+
+  it("reports feature size and rim without judging them when no minimum is set", () => {
+    const r = labelled(mesh(box(0.25, 3, 6)), { ...profile, minWallMm: null });
+    expect(r.checks.minimumFeatureSize!.status).toBe("not_run");
+    expect(r.checks.minimumFeatureSize!.measured).toBeDefined();
+    expect(r.checks.minimumWallThickness!.status).toBe("not_run");
+    expect(r.errors).toEqual([]);
+  });
+
+  it("rejects labels that do not match the triangles", () => {
+    expect(() => validateMesh(mesh(box(1, 1, 1)), { productType: "test", profile, densityGcm3: 10, surfaceLabels: new Uint8Array(3) })).toThrow();
+  });
+});
+
+describe("rim angle", () => {
+  const face = { faceLengthMm: 10, faceWidthMm: 8, cornerRadiusMm: 1, reliefMm: 1 };
+  const cols = 101, rows = 81, dz = 8 / (rows - 1);
+  const field = (f: (x: number, zFromEdge: number) => number) => {
+    const data = new Float32Array(cols * rows);
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) data[j * cols + i] = f(-5 + i * 0.1, j * dz);
+    return { ...face, data, cols, rows };
+  };
+
+  it("is 90° for flat terrain and is reported, not judged, without a minimum", () => {
+    const r = rimAngleCheck(field(() => 0.5), null);
+    expect(r.check.status).toBe("not_run");
+    expect((r.check.measured as Record<string, number>).minDeg).toBeCloseTo(90, 6);
+    expect(r.error).toBeUndefined();
+  });
+
+  it("measures a cliff rising into the rim and fails it against a minimum", () => {
+    // Rises 1 mm over the last 0.3 mm before the −Z edge.
+    const r = rimAngleCheck(field((_x, d) => Math.max(0, 1 - d / 0.3)), 45);
+    const measured = (r.check.measured as Record<string, number>).minDeg;
+    expect(measured).toBeCloseTo(90 - (Math.atan2(0.5, 0.15) * 180) / Math.PI, 0);
+    expect(r.check.status).toBe("fail");
+    expect(r.error?.code).toBe("MINIMUM_RIM_ANGLE");
+  });
+
+  it("ignores the plan corners, where the height map edge lies outside the head", () => {
+    const r = rimAngleCheck(field((x, d) => (Math.abs(x) > 4.05 ? Math.max(0, 1 - d / 0.3) : 0)), 45);
+    expect(r.check.status).toBe("pass");
   });
 });

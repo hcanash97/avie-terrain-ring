@@ -717,9 +717,33 @@ export function createRingMesh(p: RingParameters): RingMesh {
     );
   }
 
+  // Surface labels for validation (no effect on geometry): 0 body, 1 terrain
+  // relief, 2 inner (finger), 3 terrain rim (the edge round and the strip of
+  // side wall that rises to the terrain). Inner-surface vertices occupy one
+  // contiguous block straight after the outer surface; side walls follow.
+  const innerStart = n * outerColumns,
+    innerEnd = innerStart + n * innerColumns;
+  const allIndices = [...faceIndices, ...indices];
+  const surfaceLabels = new Uint8Array(allIndices.length / 3);
+  // Outer-surface vertices inside the designed edge round, where terrain meets the rim.
+  const inRound = new Uint8Array(innerStart);
+  rows.forEach((row, r) => {
+    const h = halfWidth(row);
+    const radius = Math.min(edgeRadius(row), h * 0.4);
+    for (let k = 0; k < outerColumns; k++)
+      if (Math.abs(zAt(row, k, outerColumns)) > h - radius - 1e-9) inRound[r * outerColumns + k] = 1;
+  });
+  for (let t = 0; t < surfaceLabels.length; t++) {
+    const v = [allIndices[t * 3]!, allIndices[t * 3 + 1]!, allIndices[t * 3 + 2]!];
+    if (v.every((i) => i >= innerStart && i < innerEnd)) surfaceLabels[t] = 2;
+    else if (v.some((i) => terrainBlends[i]! > 1e-3))
+      surfaceLabels[t] = v.some((i) => i >= innerEnd || inRound[i] === 1) ? 3 : 1;
+  }
+
   return {
+    surfaceLabels,
     positions: new Float32Array(positions),
-    indices: new Uint32Array([...faceIndices, ...indices]),
+    indices: new Uint32Array(allIndices),
     shade: new Float32Array(shades),
     terrainBlend: new Float32Array(terrainBlends),
     terrainAdapted,

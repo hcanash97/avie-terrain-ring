@@ -84,7 +84,7 @@ The brief's 15 questions stand. Send them with the first review-only package fro
 - **Output (sample):** `ORDER-SAMPLE-001_WR-CDC7E86` (Slim bar, Snowdon, 9ct, N). Validation is held for review with no errors, and the reopen checks passed. Mass is 3.59 g; the production mesh has about 263k triangles at Standard size.
 - **Not yet:**
   - `production-spec.pdf` (the JSON is authoritative for now).
-  - Feature-width analysis (reported as not_run).
+  - A feature-size minimum and rim-angle minimum (both measured since validator v2; neither is set).
   - Renders are passed in from the configurator's fixed-camera capture, not generated headless.
 
 ### Findings from the first runs
@@ -96,10 +96,17 @@ The brief's 15 questions stand. Send them with the first review-only package fro
      - The side wall leaves the round along the same direction, so there is no new crease.
      - Terrain is sampled at each point's true plan position.
    - Effect: 99% of vertices move under 0.25 mm (largest 0.81 mm, at cushion corners). There are no self-intersections in an 82-configuration sweep (7 places, both shapes, 3 face sizes, 3 shoulders, sizes H/N/Z, 70% and 100% height). A regression test guards it.
-2. **Thin regions:**
-   - The 1st-percentile wall is about 0.65–0.75 mm (Slim sample 0.653 mm; 2.5% of the sampled surface under 0.8 mm).
-   - The measured minimum (0.04 mm on the sample) is a single point at an edge round or crease. Ray-cast thickness exaggerates thinness at tight convex edges.
-   - These numbers go to the manufacturer with question 2, before any minimum is set.
-3. **Very thin spots on canyon and valley terrain:**
-   - Grand Canyon and Lake District at full height have a 1st-percentile wall of 0.1–0.3 mm, against about 0.65 mm elsewhere. No crossings.
-   - Likely cause: deep valleys cutting close to the inner surface, plus sharp ridges. To investigate next (a minimum floor under the terrain, or a relief cap for these places).
+2. **Thin regions: measurement split (validator v2, 12 Nov).**
+   - **Investigation:** the earlier figures (1st percentile 0.65 mm; 0.1–0.3 mm on Grand Canyon and Lake District) mixed three different things into one ray-cast number:
+     - **Structural metal**, between the outside and the finger: about 1.08 mm at the 1st percentile on every place tested. That is the 1.2 mm band less its comfort curve, and the 0.9 mm table under the terrain.
+     - **Terrain sharpness:** on steep terrain the inward ray re-exits through a nearby crest. Straight-down rays from the same points found thick metal 91% (Grand Canyon) and 98% (Lake District) of the time, and at least 1.13 mm sits behind every thin reading. The sphere method confirms these are sharp crests and narrow spurs, not missing metal.
+     - **Rim knife-edges:** where a cliff runs into the frame edge, the terrain meets the vertical head wall at as little as 20° (Grand Canyon) and 29° (Lake District), against 63° or more on Snowdon and Matterhorn. These are real cliffs in the data, not an edge-processing artefact.
+   - **Change (no shape change):**
+     - The generator labels each triangle as body, terrain, inner or rim.
+     - The validator reports three things separately:
+       - **structural wall:** rays that start or end on the finger surface;
+       - **terrain feature size:** sphere method, terrain relief only;
+       - **rim angle:** long sides, from the height data.
+     - Body-to-body edge readings are reported but not judged.
+     - Each check states its method. Nothing is judged without a minimum, and no minimum has been set: the CLI's `--min-wall`, `--min-feature` and `--min-rim-angle` are a reviewer's trial values, never an approval.
+   - **Not done:** any local correction of the terrain. The options are a rolling-ball limit on narrow features and a rim fill. They wait for a feature-size and rim-angle minimum, ideally the manufacturer's (question 2).

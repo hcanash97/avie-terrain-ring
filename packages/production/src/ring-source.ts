@@ -87,7 +87,7 @@ export function buildProductionRing(config: RingConfiguration) {
     terrain,
     resolution: PRODUCTION_RESOLUTION
   });
-  const mesh: IndexedMesh = weld({ positions: raw.positions, indices: raw.indices });
+  const mesh: IndexedMesh = weld({ positions: raw.positions, indices: raw.indices, surfaceLabels: raw.surfaceLabels });
   // Relief: highest terrain point above the head's table.
   const tableY = innerDiameterMm / 2 + Math.max(preset.headHeightMm, 0.8);
   let maxY = -Infinity;

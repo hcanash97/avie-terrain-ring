@@ -40,7 +40,7 @@ export type ValidationReport = {
   validatorVersion: string;
 };
 
-export const VALIDATOR_VERSION = "mesh-validation/v1";
+export const VALIDATOR_VERSION = "mesh-validation/v2";
 
 const sub = (a: number[], b: number[]) => [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!];
 const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
@@ -195,18 +195,35 @@ export function selfIntersections(m: Mesh, bvh: TriangleBVH, limit = 1000, locat
 }
 
 /**
- * Wall thickness by inward ray casting from triangle centroids along the
- * inverted face normal. Reports the distribution; the minimum is located so it
- * can be inspected. Thin results at sharp convex edges are real thin metal.
+ * Surface labels, one per triangle, supplied by the product generator. They let
+ * thickness be reported by what it means rather than as one mixed figure:
+ *   - inner: the finger (or back) surface. Rays that start or end here measure
+ *     the metal between the outside and the wearer: STRUCTURAL wall.
+ *   - terrain: relief and its rim. Thin readings between two terrain points
+ *     measure how sharp or narrow a feature is, not how much metal is behind it.
+ *   - rim: where terrain meets the product's wall (edge round and wall strip).
+ *     Judged by a product-specific rim check, not the feature measure.
+ *   - body: everything else (band, shoulders, side walls, edge rounds).
  */
-export function wallThickness(m: Mesh, bvh: TriangleBVH, maxSamples = 60000) {
+export const SURFACE = { body: 0, terrain: 1, inner: 2, rim: 3 } as const;
+export type SurfaceLabel = (typeof SURFACE)[keyof typeof SURFACE];
+
+type RaySample = { t: number; from: number; to: number; at: number[]; tri: number };
+
+/**
+ * Inward ray cast from triangle centroids: distance to where the ray leaves the
+ * solid. Inner-surface triangles are all sampled (there are few of them); the
+ * rest are sampled evenly up to `maxSamples`.
+ */
+export function rayThickness(m: Mesh, bvh: TriangleBVH, labels?: ArrayLike<number>, maxSamples = 60000) {
   const I = m.indices;
   const n = I.length / 3;
   const stride = Math.max(1, Math.ceil(n / maxSamples));
-  const values: number[] = [];
-  let min = Infinity, minAt: number[] = [];
+  const samples: RaySample[] = [];
   let misses = 0;
-  for (let t = 0; t < n; t += stride) {
+  for (let t = 0; t < n; t++) {
+    const from = labels ? labels[t]! : SURFACE.body;
+    if (t % stride !== 0 && from !== SURFACE.inner) continue;
     const a = vertex(m, I[t * 3]!), b = vertex(m, I[t * 3 + 1]!), c = vertex(m, I[t * 3 + 2]!);
     const nn = cross(sub(b, a), sub(c, a));
     const len = Math.hypot(...nn);
@@ -215,12 +232,70 @@ export function wallThickness(m: Mesh, bvh: TriangleBVH, maxSamples = 60000) {
     const o = [(a[0]! + b[0]! + c[0]!) / 3, (a[1]! + b[1]! + c[1]!) / 3, (a[2]! + b[2]! + c[2]!) / 3];
     const hit = bvh.raycast(o, dir, t);
     if (!Number.isFinite(hit.t)) { misses++; continue; }
-    values.push(hit.t);
-    if (hit.t < min) { min = hit.t; minAt = o; }
+    samples.push({ t: hit.t, from, to: labels ? labels[hit.tri]! : SURFACE.body, at: o, tri: t });
   }
-  values.sort((x, y) => x - y);
+  return { samples, misses };
+}
+
+/** Distribution summary of a set of thickness readings (mm), with the location of the smallest. */
+export function summarise(readings: { t: number; at: number[] }[]) {
+  const values = readings.map((r) => r.t).sort((x, y) => x - y);
+  let minAt: number[] = [];
+  let min = Infinity;
+  for (const r of readings) if (r.t < min) { min = r.t; minAt = r.at; }
   const q = (p: number) => values[Math.min(values.length - 1, Math.floor(p * (values.length - 1)))] ?? NaN;
-  return { samples: values.length, misses, minMm: min, p1Mm: q(0.01), p5Mm: q(0.05), medianMm: q(0.5), minAt, values };
+  return { samples: values.length, minMm: min, p1Mm: q(0.01), p5Mm: q(0.05), medianMm: q(0.5), minAt, values };
+}
+
+/** Backwards-compatible single figure over every sampled triangle (no surface split). */
+export function wallThickness(m: Mesh, bvh: TriangleBVH, maxSamples = 60000) {
+  const { samples, misses } = rayThickness(m, bvh, undefined, maxSamples);
+  return { ...summarise(samples), misses };
+}
+
+/** Largest feature diameter reported; anything at least this wide reads as this value. */
+export const FEATURE_CAP_MM = 2;
+
+/**
+ * Feature size by the sphere method ("shrinking ball", Ma et al. 2012): the
+ * diameter of the largest ball that fits inside the metal while touching the
+ * surface at the sample point. Small at sharp crests, narrow ridges and
+ * knife-edges, whatever direction they face; large wherever the surface is
+ * backed by broad metal. Sampled on terrain triangles only.
+ */
+export function featureSize(m: Mesh, bvh: TriangleBVH, labels: ArrayLike<number>, maxSamples = 12000) {
+  const I = m.indices;
+  const terrain: number[] = [];
+  for (let t = 0; t < I.length / 3; t++) if (labels[t] === SURFACE.terrain) terrain.push(t);
+  const stride = Math.max(1, Math.ceil(terrain.length / maxSamples));
+  const readings: { t: number; at: number[] }[] = [];
+  for (let k = 0; k < terrain.length; k += stride) {
+    const t = terrain[k]!;
+    const a = vertex(m, I[t * 3]!), b = vertex(m, I[t * 3 + 1]!), c = vertex(m, I[t * 3 + 2]!);
+    const nn = cross(sub(b, a), sub(c, a));
+    const len = Math.hypot(...nn);
+    if (len === 0) continue;
+    const d = nn.map((x) => -x / len);
+    const o = [(a[0]! + b[0]! + c[0]!) / 3, (a[1]! + b[1]! + c[1]!) / 3, (a[2]! + b[2]! + c[2]!) / 3];
+    // A ball touching o along d cannot be wider than the inward ray reading, so start there.
+    const ray = bvh.raycast(o, d, t);
+    let r = Math.min(FEATURE_CAP_MM, ray.t) / 2;
+    for (let iter = 0; iter < 60; iter++) {
+      const centre = o.map((x, i) => x + d[i]! * r);
+      const near = bvh.nearest(centre, r * (1 - 1e-6));
+      if (!Number.isFinite(near.dist)) break; // nothing inside the ball: it fits
+      const v = sub(near.point, o);
+      const along = dot(v, d);
+      if (along <= 1e-12) break;
+      // Ball through o (tangent there) and the intruding point.
+      const next = dot(v, v) / (2 * along);
+      if (!(next < r)) break;
+      r = next;
+      if (r < 1e-4) break;
+    }
+    readings.push({ t: 2 * r, at: o });
+  }
+  return summarise(readings);
 }
 
 export type CommonInputs = {
@@ -229,9 +304,14 @@ export type CommonInputs = {
   densityGcm3: number;
   /** Relief measured by the product (top of terrain above its base), if applicable. */
   reliefMm?: number;
+  /** One SURFACE label per triangle. Without labels, thickness cannot be split by meaning. */
+  surfaceLabels?: ArrayLike<number>;
 };
 
-export function validateMesh(m: Mesh, inputs: CommonInputs): ValidationReport & { wall: ReturnType<typeof wallThickness> } {
+export function validateMesh(
+  m: Mesh,
+  inputs: CommonInputs
+): ValidationReport & { wall: ReturnType<typeof wallThickness>; feature: ReturnType<typeof summarise> | null } {
   const { profile } = inputs;
   const checks: Record<string, Check> = {};
   const errors: ValidationError[] = [];
@@ -279,24 +359,50 @@ export function validateMesh(m: Mesh, inputs: CommonInputs): ValidationReport & 
   };
   if (crossings) fail("SELF_INTERSECTIONS", "Triangles cross each other.", crossings, 0);
 
-  const wall = wallThickness(m, bvh);
-  const wallMeasured = { minMm: +wall.minMm.toFixed(3), p1Mm: +wall.p1Mm.toFixed(3), p5Mm: +wall.p5Mm.toFixed(3), medianMm: +wall.medianMm.toFixed(3), samples: wall.samples, misses: wall.misses };
+  // --- Thickness, split by what it means --------------------------------------
+  const labels = inputs.surfaceLabels;
+  if (labels && labels.length !== m.indices.length / 3) throw new Error("surfaceLabels must have one entry per triangle");
+  const rays = rayThickness(m, bvh, labels);
+  const fmt = (w: ReturnType<typeof summarise>) => ({ minMm: +w.minMm.toFixed(3), p1Mm: +w.p1Mm.toFixed(3), p5Mm: +w.p5Mm.toFixed(3), medianMm: +w.medianMm.toFixed(3), samples: w.samples });
+  const at = (w: ReturnType<typeof summarise>) => w.minAt.map((v) => +v.toFixed(3));
+  const structural = summarise(labels ? rays.samples.filter((r) => r.from === SURFACE.inner || r.to === SURFACE.inner) : rays.samples);
+  const wall = { ...structural, misses: rays.misses };
+  const wallMethod = labels
+    ? "structural: inward ray cast from triangle centroids, counting only rays that start or end on the inner (finger) surface, i.e. metal between the outside and the wearer; judged on the 1st percentile"
+    : "inward ray cast from every sampled triangle centroid (surfaces not labelled, so terrain sharpness and edge rounds are mixed in); judged on the 1st percentile";
   if (profile.minWallMm === null) {
-    checks.minimumWallThickness = { status: "not_run", method: "inward ray cast from face centroids", measured: wallMeasured, note: "No minimum set in this constraint profile." };
+    checks.minimumWallThickness = { status: "not_run", method: wallMethod, measured: { ...fmt(structural), misses: rays.misses }, location: at(structural), note: "Measured only: no minimum is set in this constraint profile." };
   } else {
-    const ok = wall.p1Mm >= profile.minWallMm;
-    checks.minimumWallThickness = {
-      status: ok ? "pass" : "fail",
-      method: "inward ray cast from face centroids; judged on the 1st percentile, minimum reported with location",
-      measured: wallMeasured,
-      required: profile.minWallMm,
-      location: wall.minAt.map((v) => +v.toFixed(3))
-    };
-    if (!ok) fail("MINIMUM_WALL_THICKNESS", "Metal falls below the minimum wall thickness.", +wall.p1Mm.toFixed(3), profile.minWallMm);
+    const ok = structural.p1Mm >= profile.minWallMm;
+    checks.minimumWallThickness = { status: ok ? "pass" : "fail", method: wallMethod, measured: { ...fmt(structural), misses: rays.misses }, required: profile.minWallMm, location: at(structural) };
+    if (!ok) fail("MINIMUM_WALL_THICKNESS", "Metal between the outside and the finger falls below the minimum wall thickness.", +structural.p1Mm.toFixed(3), profile.minWallMm);
   }
-  if (wall.misses) warnings.push({ code: "WALL_RAY_MISSES", message: "Some thickness rays escaped the solid; check for open regions.", measured: wall.misses });
+  if (rays.misses) warnings.push({ code: "WALL_RAY_MISSES", message: "Some thickness rays escaped the solid; check for open regions.", measured: rays.misses });
 
-  checks.minimumFeatureSize = { status: "not_run", method: "not implemented", note: "Feature-width analysis is planned; the manufacturer's minimum is also not yet known." };
+  let feature: ReturnType<typeof summarise> | null = null;
+  if (labels) {
+    const body = (x: number) => x === SURFACE.body;
+    const edges = summarise(rays.samples.filter((r) => body(r.from) && body(r.to)));
+    checks.edgeRayThickness = {
+      status: "not_run",
+      method: "inward ray cast between body surfaces (band, shoulders, side walls), not touching the finger or terrain",
+      measured: fmt(edges),
+      location: at(edges),
+      note: "Reported only, not judged: at convex edge rounds a ray crosses the round itself, so small readings here describe the edge radius, not missing metal."
+    };
+    feature = featureSize(m, bvh, labels);
+    const measured = fmt(feature);
+    const method = `sphere method on terrain relief triangles (rim excluded): diameter of the largest ball inside the metal touching each point (shrinking ball); capped at ${FEATURE_CAP_MM} mm; judged on the 1st percentile`;
+    if (profile.minFeatureMm === null) {
+      checks.minimumFeatureSize = { status: "not_run", method, measured, location: at(feature), note: "Measured only: no minimum feature size is set in this constraint profile." };
+    } else {
+      const ok = feature.p1Mm >= profile.minFeatureMm;
+      checks.minimumFeatureSize = { status: ok ? "pass" : "fail", method, measured, required: profile.minFeatureMm, location: at(feature) };
+      if (!ok) fail("MINIMUM_FEATURE_SIZE", "Terrain features are narrower or sharper than the minimum feature size.", +feature.p1Mm.toFixed(3), profile.minFeatureMm);
+    }
+  } else {
+    checks.minimumFeatureSize = { status: "not_run", method: "sphere method on terrain triangles", note: "Surfaces are not labelled, so terrain cannot be told apart from the body." };
+  }
 
   if (inputs.reliefMm === undefined || profile.maxReliefMm === null) {
     checks.maximumRelief = { status: "not_run", method: "terrain top above product base", measured: inputs.reliefMm };
@@ -329,6 +435,20 @@ export function validateMesh(m: Mesh, inputs: CommonInputs): ValidationReport & 
     warnings,
     checks,
     validatorVersion: VALIDATOR_VERSION,
-    wall
+    wall,
+    feature
+  };
+}
+
+/** Add a product-specific check to a report, keeping validity and status consistent. */
+export function withCheck<R extends ValidationReport>(report: R, name: string, check: Check, error?: ValidationError): R {
+  const errors = error ? [...report.errors, error] : report.errors;
+  const valid = errors.length === 0;
+  return {
+    ...report,
+    checks: { ...report.checks, [name]: check },
+    errors,
+    valid,
+    status: !valid ? "fail" : report.constraintProfile.approved ? "pass" : "held_for_review"
   };
 }

@@ -37,8 +37,12 @@ export type PackageOptions = {
   orderRef: string; // e.g. "SAMPLE-001"; never customer personal data
   outDir: string;
   geometryVersion: string; // e.g. git commit of the generator
-  /** Minimum wall to judge against; null = measure and report only (no approved figure yet). */
+  /** Minimum structural wall to judge against; null = measure and report only (no approved figure yet). */
   minWallMm: number | null;
+  /** Minimum terrain feature size (sphere diameter) to judge against; null = report only. */
+  minFeatureMm?: number | null;
+  /** Minimum rim angle (terrain against the head wall) to judge against; null = report only. */
+  minRimAngleDeg?: number | null;
   rendersDir?: string; // folder with front.png, side.png, three_quarter.png
 };
 
@@ -116,28 +120,59 @@ export async function buildRingPackage(opts: PackageOptions) {
   const reopenOk = Object.values(reopen).every((r) => Object.values(r).every((v) => typeof v !== "boolean" || v));
 
   // --- Validation ---------------------------------------------------------
-  const report = validation.validateMesh(ring.mesh, {
+  const minFeatureMm = opts.minFeatureMm ?? null;
+  const minRimAngleDeg = opts.minRimAngleDeg ?? null;
+  const thresholds = [
+    opts.minWallMm === null ? "" : `wall-${opts.minWallMm}mm`,
+    minFeatureMm === null ? "" : `feature-${minFeatureMm}mm`,
+    minRimAngleDeg === null ? "" : `rim-${minRimAngleDeg}deg`
+  ].filter(Boolean);
+  const validated = validation.validateMesh(ring.mesh, {
     productType: "terrain_ring",
     profile: {
-      id: opts.minWallMm === null ? "awaiting-manufacturer" : `review-min-wall-${opts.minWallMm}mm`,
+      // Thresholds passed on the command line are a reviewer's choice for this run, never an approval.
+      id: thresholds.length ? `review-${thresholds.join("-")}` : "awaiting-manufacturer",
       approved: false,
       minWallMm: opts.minWallMm,
-      minFeatureMm: null,
+      minFeatureMm,
       maxReliefMm: ring.preset.maxReliefMm
     },
     densityGcm3: ring.densityGcm3,
-    reliefMm: ring.reliefMm
+    reliefMm: ring.reliefMm,
+    surfaceLabels: ring.mesh.surfaceLabels
   });
-  const { wall, ...reportBody } = report;
-  const wallBelow = (mm: number) => +(100 * wall.values.filter((v) => v < mm).length / Math.max(1, wall.values.length)).toFixed(2);
+  const rim = validation.rimAngleCheck(
+    { ...ring.terrain, faceLengthMm: ring.preset.faceLengthMm, faceWidthMm: ring.preset.faceWidthMm, cornerRadiusMm: ring.preset.cornerRadiusMm },
+    minRimAngleDeg
+  );
+  const report = validation.withCheck(validated, "minimumRimAngle", rim.check, rim.error);
+  const { wall, feature, ...reportBody } = report;
+  const below = (values: number[], mm: number) => +((100 * values.filter((v) => v < mm).length) / Math.max(1, values.length)).toFixed(2);
+  const bands = (values: number[], mms: number[]) => Object.fromEntries(mms.map((mm) => [`${mm}mm`, below(values, mm)]));
   const validationReport = {
     ...reportBody,
     reopen,
     reopenPassed: reopenOk,
-    wallThicknessDistribution: {
-      percentBelow: { "0.6mm": wallBelow(0.6), "0.8mm": wallBelow(0.8), "1.0mm": wallBelow(1.0), "1.2mm": wallBelow(1.2), "1.4mm": wallBelow(1.4), "1.8mm": wallBelow(1.8) },
-      note: "Share of sampled surface whose inward thickness is below each value. Compare with the manufacturer's alloy-specific minimum."
-    }
+    distributions: {
+      structuralWall: {
+        percentBelow: bands(wall.values, [0.6, 0.8, 1.0, 1.2, 1.4, 1.8]),
+        note: "Share of structural samples (metal between the outside and the finger) below each value. Reporting bands, not requirements."
+      },
+      ...(feature
+        ? {
+            terrainFeatureSize: {
+              percentBelow: bands(feature.values, [0.2, 0.3, 0.5, 0.8]),
+              note: "Share of sampled terrain whose sphere-method feature size is below each value. Small values mean sharp crests, narrow ridges or rim knife-edges; they do not mean missing metal behind the surface. Reporting bands, not requirements."
+            }
+          }
+        : {})
+    },
+    limitations: [
+      "Ray-cast thickness is sampled at triangle centroids; the structural figure counts only rays that start or end on the finger surface.",
+      "The sphere method is capped at 2 mm and sampled on terrain triangles; it measures sharpness and narrowness, which polishing will also reduce.",
+      "The rim angle is measured from the height data along both long sides, assuming the head wall is vertical there; the plan corners and face ends are not covered.",
+      "No check here establishes casting suitability; that requires the manufacturer's approved minimums and a physical sample."
+    ]
   };
   writeFileSync(join(spec, "validation-report.json"), JSON.stringify(validationReport, null, 2));
 

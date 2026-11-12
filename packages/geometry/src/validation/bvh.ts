@@ -2,6 +2,15 @@
  * Bounding-volume hierarchy over triangles for ray casts (wall thickness) and
  * triangle-pair overlap queries (self-intersection). Pure; deterministic.
  */
+// Module-level helpers: closures created per call are slow in hot loops.
+const sub = (u: number[], v: number[]) => [u[0]! - v[0]!, u[1]! - v[1]!, u[2]! - v[2]!];
+const dot = (u: number[], v: number[]) => u[0]! * v[0]! + u[1]! * v[1]! + u[2]! * v[2]!;
+const lerp3 = (A: number[], B: number[], C: number[], u: number, v: number) => [
+  A[0]! + u * (B[0]! - A[0]!) + v * (C[0]! - A[0]!),
+  A[1]! + u * (B[1]! - A[1]!) + v * (C[1]! - A[1]!),
+  A[2]! + u * (B[2]! - A[2]!) + v * (C[2]! - A[2]!)
+];
+
 export type Tri = { positions: ArrayLike<number>; indices: ArrayLike<number> };
 
 type Node = { min: number[]; max: number[]; left: number; right: number; start: number; count: number };
@@ -83,6 +92,58 @@ export class TriangleBVH {
       }
     }
     return { t: bestTri < 0 ? Infinity : best, tri: bestTri };
+  }
+
+  /** Closest point on the surface to `p` within `maxDist`; dist is Infinity if none. */
+  nearest(p: number[], maxDist = Infinity): { dist: number; point: number[]; tri: number } {
+    let best = maxDist * maxDist, bestPoint: number[] = [], bestTri = -1;
+    const stack = [0];
+    while (stack.length) {
+      const node = this.nodes[stack.pop()!]!;
+      let d2 = 0;
+      for (let k = 0; k < 3; k++) {
+        const v = p[k]! < node.min[k]! ? node.min[k]! - p[k]! : p[k]! > node.max[k]! ? p[k]! - node.max[k]! : 0;
+        d2 += v * v;
+      }
+      if (d2 >= best) continue;
+      if (node.count > 0) {
+        for (let i = node.start; i < node.start + node.count; i++) {
+          const tri = this.order[i]!;
+          const q = this.closestOnTriangle(p, tri);
+          const e = (q[0]! - p[0]!) ** 2 + (q[1]! - p[1]!) ** 2 + (q[2]! - p[2]!) ** 2;
+          if (e < best) { best = e; bestPoint = q; bestTri = tri; }
+        }
+      } else {
+        stack.push(node.left, node.right);
+      }
+    }
+    return { dist: bestTri < 0 ? Infinity : Math.sqrt(best), point: bestPoint, tri: bestTri };
+  }
+
+  /** Closest point on triangle `tri` to `p` (Ericson, Real-Time Collision Detection 5.1.5). */
+  closestOnTriangle(p: number[], tri: number): number[] {
+    const P = this.mesh.positions, I = this.mesh.indices;
+    const A = [P[I[tri * 3]! * 3]!, P[I[tri * 3]! * 3 + 1]!, P[I[tri * 3]! * 3 + 2]!];
+    const B = [P[I[tri * 3 + 1]! * 3]!, P[I[tri * 3 + 1]! * 3 + 1]!, P[I[tri * 3 + 1]! * 3 + 2]!];
+    const C = [P[I[tri * 3 + 2]! * 3]!, P[I[tri * 3 + 2]! * 3 + 1]!, P[I[tri * 3 + 2]! * 3 + 2]!];
+    const ab = sub(B, A), ac = sub(C, A), ap = sub(p, A);
+    const d1 = dot(ab, ap), d2 = dot(ac, ap);
+    if (d1 <= 0 && d2 <= 0) return A;
+    const bp = sub(p, B), d3 = dot(ab, bp), d4 = dot(ac, bp);
+    if (d3 >= 0 && d4 <= d3) return B;
+    const vc = d1 * d4 - d3 * d2;
+    if (vc <= 0 && d1 >= 0 && d3 <= 0) return lerp3(A, B, C, d1 / (d1 - d3), 0);
+    const cp = sub(p, C), d5 = dot(ab, cp), d6 = dot(ac, cp);
+    if (d6 >= 0 && d5 <= d6) return C;
+    const vb = d5 * d2 - d1 * d6;
+    if (vb <= 0 && d2 >= 0 && d6 <= 0) return lerp3(A, B, C, 0, d2 / (d2 - d6));
+    const va = d3 * d6 - d5 * d4;
+    if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+      const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
+      return [B[0]! + w * (C[0]! - B[0]!), B[1]! + w * (C[1]! - B[1]!), B[2]! + w * (C[2]! - B[2]!)];
+    }
+    const denom = 1 / (va + vb + vc);
+    return lerp3(A, B, C, vb * denom, vc * denom);
   }
 
   /** Möller–Trumbore; returns t or -1. */
