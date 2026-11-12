@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Snowdon, GB",
+    "lat": 53.0685,
+    "lon": -4.0763,
+    "lengthM": 6000
+  },
+  {
+    "name": "Ben Nevis, GB",
+    "lat": 56.7969,
+    "lon": -5.0036,
+    "lengthM": 7000
+  },
+  {
+    "name": "Matterhorn, CH",
+    "lat": 45.9763,
+    "lon": 7.6586,
+    "lengthM": 6000
+  },
+  {
+    "name": "Table Mountain, ZA",
+    "lat": -33.9628,
+    "lon": 18.4098,
+    "lengthM": 8000
+  },
+  {
+    "name": "Mount Fuji, JP",
+    "lat": 35.3606,
+    "lon": 138.7274,
+    "lengthM": 20000
+  },
+  {
+    "name": "Grand Canyon, US",
+    "lat": 36.0997,
+    "lon": -112.1124,
+    "lengthM": 16000
+  },
+  {
+    "name": "Lake District, GB",
+    "lat": 54.46,
+    "lon": -3.09,
+    "lengthM": 18000
+  },
+  {
+    "name": "Mont Blanc, FR",
+    "lat": 45.8326,
+    "lon": 6.8652,
+    "lengthM": 10000
+  },
+  {
+    "name": "Mount Everest, NP",
+    "lat": 27.9881,
+    "lon": 86.925,
+    "lengthM": 14000
+  },
+  {
+    "name": "Dolomites, IT",
+    "lat": 46.6186,
+    "lon": 12.3026,
+    "lengthM": 10000
+  },
+  {
+    "name": "Old Man of Storr, GB",
+    "lat": 57.5073,
+    "lon": -6.183,
+    "lengthM": 6000
+  },
+  {
+    "name": "Yosemite, US",
+    "lat": 37.7459,
+    "lon": -119.5332,
+    "lengthM": 12000
+  },
+  {
+    "name": "Uluru, AU",
+    "lat": -25.3444,
+    "lon": 131.0369,
+    "lengthM": 7000
+  },
+  {
+    "name": "Milford Sound, NZ",
+    "lat": -44.623,
+    "lon": 167.897,
+    "lengthM": 14000
+  },
+  {
+    "name": "Mount Etna, IT",
+    "lat": 37.751,
+    "lon": 14.9934,
+    "lengthM": 16000
+  }
+]

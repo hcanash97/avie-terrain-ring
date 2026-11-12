@@ -107,7 +107,7 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
 
 import baked from "../data/baked.json";
 
-type BakedMeta = { id: string; size: number; mPerPx: number; cx: number; cy: number; radiusM: number };
+type BakedMeta = { elevationStepM?: number; id: string; size: number; mPerPx: number; cx: number; cy: number; radiusM: number };
 
 /**
  * Pre-baked elevation for the preset places (see scripts/bake-terrain.mjs).
@@ -125,7 +125,7 @@ export async function loadBakedSource(placeName: string, signal?: AbortSignal): 
   ctx.drawImage(img, 0, 0);
   const px = ctx.getImageData(0, 0, n, n).data;
   const raw = new Float32Array(n * n);
-  for (let i = 0; i < raw.length; i++) raw[i] = (px[i * 4]! * 256 + px[i * 4 + 1]!) / 10;
+  for (let i = 0; i < raw.length; i++) raw[i] = (px[i * 4]! * 256 + px[i * 4 + 1]!) * (meta.elevationStepM ?? 0.1);
   const at = (x: number, y: number) => raw[Math.min(n - 1, Math.max(0, y)) * n + Math.min(n - 1, Math.max(0, x))]!;
   return {
     radiusM: meta.radiusM,

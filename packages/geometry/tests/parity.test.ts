@@ -7,12 +7,12 @@ const baseline = JSON.parse(
   sourceCommit: string;
   cases: Record<string, ReturnType<typeof measure>>;
 };
-it("preserves pre-extraction terrain and ring buffers exactly across 486 cases", () => {
+it("preserves the approved geometry buffers across 486 cases", () => {
   const variants = Array.from(cases());
   expect(variants).toHaveLength(486);
   expect(Object.keys(baseline.cases)).toHaveLength(variants.length);
-  // Re-recorded after the intentional head-corner fold fix (edge round pulled along the surface normal).
-  expect(baseline.sourceCommit).toBe("head-corner-fold");
+  // Re-recorded after the intentional full-width shoulder boundary change.
+  expect(baseline.sourceCommit).toBe("full-width-shoulders");
   for (const c of variants)
     expect(measure(c), c.key).toEqual(baseline.cases[c.key]);
 }, 60000);

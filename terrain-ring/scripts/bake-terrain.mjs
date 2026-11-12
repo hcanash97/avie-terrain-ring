@@ -2,22 +2,17 @@
 // (PNG, decimetres in R/G) plus src/data/baked.json metadata, so the configurator
 // works where live tile servers are unreachable (e.g. a hosted preview).
 import { PNG } from "pngjs";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 
-const PLACES = [
-  ["Snowdon, GB", 53.0685, -4.0763, 6000],
-  ["Ben Nevis, GB", 56.7969, -5.0036, 7000],
-  ["Matterhorn, CH", 45.9763, 7.6586, 6000],
-  ["Table Mountain, ZA", -33.9628, 18.4098, 8000],
-  ["Mount Fuji, JP", 35.3606, 138.7274, 20000],
-  ["Grand Canyon, US", 36.0997, -112.1124, 16000],
-  ["Lake District, GB", 54.46, -3.09, 18000]
-];
+const PLACES = JSON.parse(readFileSync("src/data/presets.json", "utf8"));
 const TILE = 256, EARTH = 40075016.686;
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
-const meta = {};
+const meta = JSON.parse(readFileSync("src/data/baked.json", "utf8"));
 
-for (const [name, lat, lon, lengthM] of PLACES) {
+for (const {name, lat, lon, lengthM} of PLACES) {
+  if (!process.argv.includes("--all") && meta[name] && existsSync(`public/baked/${meta[name].id}.png`)) continue;
+  // High-altitude terrain exceeds 6553.5 m, the decimetre encoding limit.
+  const elevationStepM = name === "Mount Everest, NP" ? 0.2 : 0.1;
   const cosLat = Math.cos((lat * Math.PI) / 180);
   const zoom = Math.max(1, Math.min(15, Math.round(Math.log2((EARTH * cosLat) / TILE / (lengthM / 320)))));
   const mPerPx = (EARTH * cosLat) / (TILE * 2 ** zoom);
@@ -47,7 +42,7 @@ for (const [name, lat, lon, lengthM] of PLACES) {
       const png = tiles.get(`${Math.floor(gx / TILE)},${Math.floor(gy / TILE)}`);
       const i = ((gy % TILE) * TILE + (gx % TILE)) * 4;
       const m = png.data[i] * 256 + png.data[i + 1] + png.data[i + 2] / 256 - 32768;
-      out[y * size + x] = Math.round(Math.max(0, m) * 10);
+      out[y * size + x] = Math.min(65535, Math.round(Math.max(0, m) / elevationStepM));
     }
   }
   const id = slug(name);
@@ -60,7 +55,7 @@ for (const [name, lat, lon, lengthM] of PLACES) {
     img.data[i * 4 + 3] = 255;
   }
   writeFileSync(`public/baked/${id}.png`, PNG.sync.write(img));
-  meta[name] = { id, size, mPerPx, cx: cx - x0, cy: cy - y0, radiusM: lengthM * 0.72 };
+  meta[name] = { id, size, mPerPx, cx: cx - x0, cy: cy - y0, radiusM: lengthM * 0.72, elevationStepM };
   console.log(`${name}: zoom ${zoom}, ${size}², ${(out.byteLength / 1024).toFixed(0)} KB`);
 }
 writeFileSync("src/data/baked.json", JSON.stringify(meta, null, 2));

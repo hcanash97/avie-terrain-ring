@@ -54,5 +54,77 @@
     "cx": 292.8613333333342,
     "cy": 292.1519888241892,
     "radiusM": 12960
+  },
+  "Mont Blanc, FR": {
+    "id": "mont-blanc-fr",
+    "size": 544,
+    "mPerPx": 26.62902047444585,
+    "cx": 271.3443199999165,
+    "cy": 271.1119617961813,
+    "radiusM": 7200,
+    "elevationStepM": 0.1
+  },
+  "Mount Everest, NP": {
+    "id": "mount-everest-np",
+    "size": 600,
+    "mPerPx": 33.74867089134305,
+    "cx": 299.41333333333023,
+    "cy": 299.78571844438557,
+    "radiusM": 10080,
+    "elevationStepM": 0.2
+  },
+  "Dolomites, IT": {
+    "id": "dolomites-it",
+    "size": 552,
+    "mPerPx": 26.250447809142813,
+    "cx": 275.9197155556176,
+    "cy": 275.80325348081533,
+    "radiusM": 7200,
+    "elevationStepM": 0.1
+  },
+  "Old Man of Storr, GB": {
+    "id": "old-man-of-storr-gb",
+    "size": 424,
+    "mPerPx": 20.530685717136098,
+    "cx": 211.70720000000438,
+    "cy": 211.21725167206023,
+    "radiusM": 4320,
+    "elevationStepM": 0.1
+  },
+  "Yosemite, US": {
+    "id": "yosemite-us",
+    "size": 574,
+    "mPerPx": 30.220654907728385,
+    "cx": 286.32021333335433,
+    "cy": 286.42182227480225,
+    "radiusM": 8640,
+    "elevationStepM": 0.1
+  },
+  "Uluru, AU": {
+    "id": "uluru-au",
+    "size": 586,
+    "mPerPx": 17.27001224068919,
+    "cx": 292.26919111120515,
+    "cy": 292.4105473353993,
+    "radiusM": 5040,
+    "elevationStepM": 0.1
+  },
+  "Milford Sound, NZ": {
+    "id": "milford-sound-nz",
+    "size": 374,
+    "mPerPx": 54.40360591660998,
+    "cx": 186.7287111111218,
+    "cy": 186.54931419249624,
+    "radiusM": 10080,
+    "elevationStepM": 0.1
+  },
+  "Mount Etna, IT": {
+    "id": "mount-etna-it",
+    "size": 384,
+    "mPerPx": 60.43714455899196,
+    "cx": 191.7213866667007,
+    "cy": 191.31751831417205,
+    "radiusM": 11520,
+    "elevationStepM": 0.1
   }
 }

@@ -39,9 +39,7 @@ export type WeightPreset = {
 };
 
 export const WEIGHTS: Record<Weight, WeightPreset> = {
-  // Bar corners are tight (0.35–0.45 mm) so the shoulder starts almost as wide as
-  // the head: larger plan corners narrow the head's end face, and the wider head
-  // then shows as "ears" behind the shoulder in side view.
+  // Rounded head ends and shoulders now share the entire face boundary.
   // Width-led, slim cast-signet proportions: every face size shares a 1.2 mm band
   // and a 0.9 mm substrate under the terrain, measured against the reference
   // front view (band ~1.1–1.2 mm, plate under 1 mm). Face size changes width
@@ -126,25 +124,13 @@ const HEAD_EDGE_RADIUS_MM = 0.15;
 /** Band and lower shoulder edges: soft, polished. */
 const BAND_EDGE_RADIUS_MM = 0.3;
 const INNER_EDGE_RADIUS_MM = 0.25;
-/**
- * Head-to-shoulder blend (one continuous width field, no attached block):
- *   - HEAD_WALL_MM: the head keeps its full footprint for this depth under the
- *     table, so the terrain perimeter stays a crisp, readable edge.
- *   - HEAD_TAPER_MM: below that, the side walls taper smoothly into the shoulder
- *     width over this height (no underside shelf, so no notches at the arch).
- *   - END_BLEND_MM: beyond each end of the face the head width eases into the
- *     shoulder over this distance (no near-vertical end face, so no crease).
- */
-const HEAD_WALL_MM = 0.2; // just longer than the 0.15 mm edge round, so the full face width is reached
-const HEAD_TAPER_MM = 3.6;
-const END_BLEND_MM = 2.4;
 /** Interior columns on each side wall, so walls follow the blend's curves exactly. */
 const SIDE_WALL_STEPS = 10;
 const COMFORT_MM = 0.12;
 
 const smootherstep = (x: number) => {
   const t = Math.min(1, Math.max(0, x));
-  return t * t * t * (t * (t * 6 - 15) + 10);
+  return Math.min(1, Math.max(0, t * t * t * (t * (t * 6 - 15) + 10)));
 };
 
 /**
@@ -208,6 +194,7 @@ export function terrainCollar(
   z: number,
   distance: number,
   collarLength: number,
+  boundaryX = length / 2,
 ) {
   const sample = (x: number) =>
     BLOCK_BASE_MM +
@@ -220,9 +207,9 @@ export function terrainCollar(
           z / width + 0.5,
         ) * terrain.reliefMm
       : 0);
-  const height = sample((side * length) / 2);
+  const height = sample(side * boundaryX);
   const probe = Math.min(0.12, length / 20);
-  const slope = (height - sample(side * (length / 2 - probe))) / probe;
+  const slope = (height - sample(side * (boundaryX - probe))) / probe;
   const tangent = Math.max(
     -3 * height,
     Math.min(3 * height, slope * collarLength),
@@ -254,11 +241,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const W = w.faceWidthMm;
   const rIn = p.innerDiameterMm / 2;
   const yTop =
-    rIn +
-    Math.max(
-      w.headHeightMm,
-      p.constraints?.minHeadRadialMm ?? 0.8,
-    );
+    rIn + Math.max(w.headHeightMm, p.constraints?.minHeadRadialMm ?? 0.8);
   const shoulder = SHOULDERS[p.shoulder];
   const cornerAngle = Math.atan2(L / 2, yTop);
   const bandAngle = cornerAngle + shoulder.span; // where shoulder meets band (varies with finger size)
@@ -281,7 +264,9 @@ export function createRingMesh(p: RingParameters): RingMesh {
   // not subtracted from the centre-line thickness.)
   const minimumBand = p.constraints?.minBandRadialMm ?? 0.9;
   if (w.bandThicknessMm - COMFORT_MM < minimumBand) {
-    throw new Error("Band is thinner than the minimum solid metal at its centre line");
+    throw new Error(
+      "Band is thinner than the minimum solid metal at its centre line",
+    );
   }
   if (INNER_EDGE_RADIUS_MM + BAND_EDGE_RADIUS_MM > w.bandThicknessMm) {
     throw new Error("Band edge rounds do not fit within the band thickness");
@@ -351,60 +336,43 @@ export function createRingMesh(p: RingParameters): RingMesh {
       h01 = -2 * t3 + 3 * t2,
       h11 = t3 - t2;
     return [
-      h00 * ex + h10 * m0 * t0[0] + h01 * bx + h11 * m1 * t1[0],
+      h00 * ex +
+        h10 * m0 * t0[0] +
+        h01 * bx +
+        h11 * m1 * t1[0] +
+        side *
+          (headEndX((z / h) * (W / 2)) - L / 2) *
+          (1 - smootherstep(t / 0.4)),
       h00 * ey + h10 * m0 * t0[1] + h01 * by + h11 * m1 * t1[1],
     ];
   };
 
-  // Head footprint: an L × W rectangle with quarter-circle corners in plan.
+  // The head ends are eased curves across Z, not a narrow flat end with wider
+  // corners behind it. Parameterise the table and shoulders with that SAME
+  // curve: each shoulder column departs from its own point on the perimeter.
   const cornerR = Math.max(0, Math.min(w.cornerRadiusMm, W * 0.45, L * 0.45));
-  const endHalf = W / 2 - cornerR; // half-width of the head's flat end face
-  /** Half-width of the head footprint at plan position x (clamped to the end-face width beyond L/2). */
-  const footprint = (x: number) => {
-    const ax = Math.min(Math.abs(x), L / 2);
-    const e = ax - (L / 2 - cornerR);
-    return (
-      W / 2 -
-      (e > 0 && cornerR > 0
-        ? cornerR - Math.sqrt(Math.max(0, cornerR * cornerR - e * e))
-        : 0)
-    );
+  const endHalf = W / 2;
+  const headEndX = (z: number) => {
+    const e = Math.max(0, Math.min(W / 2, Math.abs(z)) - (W / 2 - cornerR));
+    return L / 2 - cornerR * smootherstep(cornerR > 0 ? e / cornerR : 0);
   };
-  /** The shoulder's own half-width at this cross-section. */
-  const shoulderHalf = (row: Row) => {
-    if (row.kind === "shoulder") {
-      // Width by the shoulder centre-line's height: head width at the top, band
-      // width where the shoulder meets the band. (Hermite y is independent of h.)
-      const y = shoulderXY(row.side, row.t, 0, 1)[1];
-      const yLow = bandOuterRadius(0) * Math.cos(bandAngle);
-      const u = Math.min(1, Math.max(0, (y - yLow) / (yTop - yLow)));
-      return bandHalf + (endHalf - bandHalf) * shoulder.flare(u);
-    }
+  const yLow = bandOuterRadius(0) * Math.cos(bandAngle);
+  // One height-driven width field through both the head and the shoulders.
+  // At the terrain base it is the full face width, tapering continuously down
+  // to the unchanged palm band. There is no separate head skirt to overhang it.
+  const widthAt = (_x: number, y: number, row: Row) => {
     if (row.kind === "band") return bandHalf;
-    // Carry more of a broad face into its supporting side wall. Previously
-    // every face row inherited the narrow flat-end width of the rounded head,
-    // making cushion corners look suspended above a pinched neck.
-    if (row.kind === "face") {
-      const target = Math.max(endHalf, footprint(row.x));
-      const support = W / L > 0.75 ? 0.5 : 0.3;
-      return endHalf + (target - endHalf) * support;
-    }
-    return endHalf; // exact end width is retained for the shoulder connection
+    const u = Math.min(
+      1,
+      Math.max(0, (y - yLow) / (yTop - HEAD_EDGE_RADIUS_MM - yLow)),
+    );
+    return bandHalf + (W / 2 - bandHalf) * shoulder.flare(u);
   };
-  /**
-   * Half-width of the solid at (x, y) within this cross-section: the shoulder width plus
-   * the head's extra width, faded smoothly downward (taper) and beyond the face ends.
-   */
-  const taperBottom = yTop - HEAD_WALL_MM - HEAD_TAPER_MM;
-  const widthAt = (x: number, y: number, row: Row) => {
-    const s = shoulderHalf(row);
-    // Concave flare from just under the table edge (u^1.4, as the classic
-    // shoulder): tapers immediately at the top, arrives smoothly at the bottom.
-    // An S-curve here held full width for ~1 mm and read as a lip in side view.
-    const down = Math.min(1, Math.max(0, (y - taperBottom) / HEAD_TAPER_MM)) ** 1.4;
-    const beyond = Math.abs(x) - L / 2;
-    const along = beyond <= 0 ? 1 : 1 - smootherstep(beyond / END_BLEND_MM);
-    return s + Math.max(0, footprint(x) - s) * down * along;
+  const shoulderHalf = (row: Row) => {
+    if (row.kind === "band") return bandHalf;
+    if (row.kind === "shoulder")
+      return widthAt(0, shoulderXY(row.side, row.t, 0, 1)[1], row);
+    return W / 2;
   };
   /** Plan position (x, y) of the row's outer centre line. */
   const outerCentre = (row: Row): [number, number] => {
@@ -436,7 +404,8 @@ export function createRingMesh(p: RingParameters): RingMesh {
       return { lift: terrainLift((row.side * L) / 2, z), blend: 1 };
     if (row.kind !== "shoulder") return { lift: 0, blend: 0 };
     const [x, y] = shoulderXY(row.side, row.t, z, h);
-    const distance = Math.hypot(x - (row.side * L) / 2, y - yTop);
+    const boundaryX = headEndX((z / h) * (W / 2));
+    const distance = Math.hypot(x - row.side * boundaryX, y - yTop);
     const result = terrainCollar(
       p.terrain,
       L,
@@ -445,6 +414,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
       (z / h) * endHalf,
       distance,
       collarLength,
+      boundaryX,
     );
     terrainAdapted ||= result.slopeLimited;
     return result;
@@ -452,8 +422,8 @@ export function createRingMesh(p: RingParameters): RingMesh {
 
   /** Where a row's outer surface sits in side profile, before edge rounding and terrain. */
   const nominalXY = (row: Row, z: number, h: number): [number, number] => {
-    if (row.kind === "face") return [row.x, yTop];
-    if (row.kind === "wall") return [(row.side * L) / 2, yTop];
+    if (row.kind === "face") return [(row.x / (L / 2)) * headEndX(z), yTop];
+    if (row.kind === "wall") return [row.side * headEndX(z), yTop];
     if (row.kind === "shoulder") return shoulderXY(row.side, row.t, z, h);
     const r = bandOuterRadius(z);
     return [-r * Math.sin(row.alpha), r * Math.cos(row.alpha)];
@@ -466,14 +436,23 @@ export function createRingMesh(p: RingParameters): RingMesh {
    * where the footprint turns through 90°, that changed the head width by up
    * to ~0.5 mm between neighbouring rows and folded the surface.
    */
-  const pullDirection = (row: Row, x: number, y: number, z: number): [number, number] => {
+  const pullDirection = (
+    row: Row,
+    x: number,
+    y: number,
+    z: number,
+  ): [number, number] => {
     const innerH = innerHalfWidth(row);
     const innerR = innerRadius(Math.sign(z) * innerH, innerH);
     const rx = -innerR * Math.sin(row.alpha) - x;
     const ry = innerR * Math.cos(row.alpha) - y;
     const rl = Math.hypot(rx, ry);
     const k =
-      row.kind === "band" ? 1 : row.kind === "shoulder" ? smootherstep(row.t) : 0;
+      row.kind === "band"
+        ? 1
+        : row.kind === "shoulder"
+          ? smootherstep(row.t)
+          : 0;
     const dx = (rx / rl) * k;
     const dy = (ry / rl) * k - (1 - k);
     const length = Math.hypot(dx, dy);
@@ -484,23 +463,14 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const outerPoint = (row: Row, z: number, withTerrain: boolean): Vec3 => {
     const h = halfWidth(row);
     const pull = edgePull(z, h, edgeRadius(row));
-    /**
-     * Bend the quarter-round onto the actual tapered wall. At the start of the
-     * round the correction and its derivative are zero. At its end the ordinary
-     * quarter-circle has zero width derivative with respect to radial depth;
-     * following widthAt there makes its tangent agree with the wall below.
-     * Keeping z=h at the endpoint instead creates a vertical tangent followed
-     * by the sloping wall (the visible line at each head corner).
-     */
+    /** Small edge round; its actual 3D tangent is used by the side wall. */
     const rounded = (x: number, y: number): Vec3 => {
       const [dx, dy] = pullDirection(row, x, y, z);
       const point: Vec3 = [x + pull * dx, y + pull * dy, z];
-      const radius = Math.min(edgeRadius(row), h * 0.4);
-      const progress = radius > 0 ? (Math.abs(z) - (h - radius)) / radius : 0;
-      point[2] +=
-        Math.sign(z) *
-        smootherstep(progress) *
-        (widthAt(point[0], point[1], row) - h);
+      // Keep the rounded perimeter at its designed plan width. Pulling its
+      // Z coordinate inward by a second width field lets a steep collar cross
+      // the vertical perimeter strip; the side wall now follows the measured
+      // 3D tangent instead.
       return point;
     };
     switch (row.kind) {
@@ -511,7 +481,8 @@ export function createRingMesh(p: RingParameters): RingMesh {
       // function of the point's own plan position (x, z) cannot fold it.
       case "face":
       case "wall": {
-        const point = rounded(row.kind === "face" ? row.x : (row.side * L) / 2, yTop);
+        const [x, y] = nominalXY(row, z, h);
+        const point = rounded(x, y);
         if (withTerrain) point[1] += terrainLift(point[0], point[2]);
         return point;
       }
@@ -520,21 +491,10 @@ export function createRingMesh(p: RingParameters): RingMesh {
         const point = rounded(x, y);
         if (withTerrain) {
           const collar = shoulderTerrain(row, z, h);
-          // Rotate the lift gradually toward the local outward normal. The
-          // rotation has zero derivative at the head boundary, preserving the
-          // existing terrain departure rather than introducing a new crease.
-          const e = 0.0001;
-          const a = shoulderXY(row.side, Math.max(0, row.t - e), z, h);
-          const b = shoulderXY(row.side, Math.min(1, row.t + e), z, h);
-          const dx = b[0] - a[0],
-            dy = b[1] - a[1];
-          const n = Math.hypot(dx, dy);
-          const turn = (1 - collar.blend) * 0.65;
-          const nx = n > 0 ? ((-row.side * dy) / n) * turn : 0;
-          const ny = n > 0 ? 1 + ((row.side * dx) / n - 1) * turn : 1;
-          const norm = Math.hypot(nx, ny);
-          point[0] += (collar.lift * nx) / norm;
-          point[1] += (collar.lift * ny) / norm;
+          // Keep the plan coordinates independent of relief. Rotating steep
+          // boundary terrain sideways can fold neighbouring shoulder columns.
+          // The collar follows the curved head edge, fading down the shoulder.
+          point[1] += collar.lift;
         }
         return point;
       }
@@ -690,21 +650,20 @@ export function createRingMesh(p: RingParameters): RingMesh {
           return outerPoint(row, side * halfWidth(row), true);
         // Resolve the wall tangent just below the round without adding vertices.
         const f = 1 - (1 - k / (wallColumns - 2)) ** 3;
-        // Leave the round along its own pull direction, so the round and the
-        // wall share a tangent. On the band the pull points at the inner edge
-        // and this is exactly the straight wall.
+        // Continue the actual 3D edge tangent, including the curved head
+        // boundary. A radial XY-only control leaves a crease at curved corners.
         const h = halfWidth(row);
-        const [nx, ny] = nominalXY(row, side * h, h);
-        const [dx, dy] = pullDirection(row, nx, ny, side * h);
-        const reach = Math.hypot(inner[0] - bare[0], inner[1] - bare[1]) / 2;
-        const cx = bare[0] + dx * reach,
-          cy = bare[1] + dy * reach;
+        const near = outerPoint(row, side * (h - 1e-6), false);
+        const tangent = bare.map((v, i) => v - near[i]!) as Vec3;
+        const length = Math.hypot(...tangent);
+        const reach = Math.hypot(...bare.map((v, i) => v - inner[i]!)) / 2;
+        const control = bare.map((v, i) => v + (tangent[i]! * reach) / length);
         const a = (1 - f) * (1 - f),
           b = 2 * f * (1 - f),
           c = f * f;
-        const x = a * inner[0] + b * cx + c * bare[0];
-        const y = a * inner[1] + b * cy + c * bare[1];
-        return [x, y, side * widthAt(x, y, row)];
+        return inner.map(
+          (v, i) => a * v + b * control[i]! + c * bare[i]!,
+        ) as Vec3;
       },
       side === 1,
       undefined,
@@ -731,13 +690,20 @@ export function createRingMesh(p: RingParameters): RingMesh {
     const h = halfWidth(row);
     const radius = Math.min(edgeRadius(row), h * 0.4);
     for (let k = 0; k < outerColumns; k++)
-      if (Math.abs(zAt(row, k, outerColumns)) > h - radius - 1e-9) inRound[r * outerColumns + k] = 1;
+      if (Math.abs(zAt(row, k, outerColumns)) > h - radius - 1e-9)
+        inRound[r * outerColumns + k] = 1;
   });
   for (let t = 0; t < surfaceLabels.length; t++) {
-    const v = [allIndices[t * 3]!, allIndices[t * 3 + 1]!, allIndices[t * 3 + 2]!];
+    const v = [
+      allIndices[t * 3]!,
+      allIndices[t * 3 + 1]!,
+      allIndices[t * 3 + 2]!,
+    ];
     if (v.every((i) => i >= innerStart && i < innerEnd)) surfaceLabels[t] = 2;
     else if (v.some((i) => terrainBlends[i]! > 1e-3))
-      surfaceLabels[t] = v.some((i) => i >= innerEnd || inRound[i] === 1) ? 3 : 1;
+      surfaceLabels[t] = v.some((i) => i >= innerEnd || inRound[i] === 1)
+        ? 3
+        : 1;
   }
 
   return {

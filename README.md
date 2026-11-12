@@ -56,6 +56,8 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 
 ## Current state (12 Nov 2026) and next steps, in priority order
 
+**Latest geometry update:** [Full-width shoulders and 15 saved location presets](docs/full-width-shoulders.md). This supersedes the older narrow flat-end shoulder connection described below.
+
 **Latest reference-photo pass:** [Shape refinement and remaining gaps](docs/shape-refinement.md). Includes the Detail camera and dev-only controlled comparison sheet.
 
 **Implemented Terra refinement:** read [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md) for current dimensions, validation, rendering recovery and remaining manufacturing work. The older round notes below are historical and are superseded by that report.

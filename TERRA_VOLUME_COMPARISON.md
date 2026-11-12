@@ -4,23 +4,23 @@ Before: f657b84. After: current generator. Classic shoulders, comfort profile, 1
 
 | Head | Size | Terrain | Before mm³ | After mm³ | Reduction | Before 9ct g | After 9ct g |
 |---|---|---|---:|---:|---:|---:|---:|
-| bar | slim | Flat | 313.0 | 283.0 | 9.6% | 3.51 | 3.17 |
-| bar | slim | Ramp | 358.8 | 335.2 | 6.6% | 4.02 | 3.75 |
-| bar | slim | Mountain | 342.1 | 312.9 | 8.5% | 3.83 | 3.50 |
-| bar | standard | Flat | 484.0 | 389.1 | 19.6% | 5.42 | 4.36 |
-| bar | standard | Ramp | 565.2 | 484.5 | 14.3% | 6.33 | 5.43 |
-| bar | standard | Mountain | 531.4 | 438.1 | 17.5% | 5.95 | 4.91 |
-| bar | bold | Flat | 757.6 | 544.0 | 28.2% | 8.49 | 6.09 |
-| bar | bold | Ramp | 893.6 | 705.0 | 21.1% | 10.01 | 7.90 |
-| bar | bold | Mountain | 829.9 | 619.2 | 25.4% | 9.29 | 6.93 |
-| cushion | slim | Flat | 369.5 | 341.1 | 7.7% | 4.14 | 3.82 |
-| cushion | slim | Ramp | 435.6 | 422.6 | 3.0% | 4.88 | 4.73 |
-| cushion | slim | Mountain | 401.8 | 375.7 | 6.5% | 4.50 | 4.21 |
-| cushion | standard | Flat | 526.2 | 438.9 | 16.6% | 5.89 | 4.92 |
-| cushion | standard | Ramp | 630.6 | 566.0 | 10.2% | 7.06 | 6.34 |
-| cushion | standard | Mountain | 577.1 | 493.2 | 14.5% | 6.46 | 5.52 |
-| cushion | bold | Flat | 797.4 | 604.5 | 24.2% | 8.93 | 6.77 |
-| cushion | bold | Ramp | 965.4 | 804.9 | 16.6% | 10.81 | 9.01 |
-| cushion | bold | Mountain | 878.9 | 690.8 | 21.4% | 9.84 | 7.74 |
+| bar | slim | Flat | 313.0 | 285.4 | 8.8% | 3.51 | 3.20 |
+| bar | slim | Ramp | 358.8 | 337.3 | 6.0% | 4.02 | 3.78 |
+| bar | slim | Mountain | 342.1 | 315.3 | 7.8% | 3.83 | 3.53 |
+| bar | standard | Flat | 484.0 | 386.9 | 20.1% | 5.42 | 4.33 |
+| bar | standard | Ramp | 565.2 | 480.8 | 14.9% | 6.33 | 5.39 |
+| bar | standard | Mountain | 531.4 | 435.9 | 18.0% | 5.95 | 4.88 |
+| bar | bold | Flat | 757.6 | 535.2 | 29.4% | 8.49 | 5.99 |
+| bar | bold | Ramp | 893.6 | 692.2 | 22.5% | 10.01 | 7.75 |
+| bar | bold | Mountain | 829.9 | 610.4 | 26.4% | 9.29 | 6.84 |
+| cushion | slim | Flat | 369.5 | 366.9 | 0.7% | 4.14 | 4.11 |
+| cushion | slim | Ramp | 435.6 | 449.1 | -3.1% | 4.88 | 5.03 |
+| cushion | slim | Mountain | 401.8 | 402.0 | -0.0% | 4.50 | 4.50 |
+| cushion | standard | Flat | 526.2 | 471.1 | 10.5% | 5.89 | 5.28 |
+| cushion | standard | Ramp | 630.6 | 598.0 | 5.2% | 7.06 | 6.70 |
+| cushion | standard | Mountain | 577.1 | 526.1 | 8.8% | 6.46 | 5.89 |
+| cushion | bold | Flat | 797.4 | 649.0 | 18.6% | 8.93 | 7.27 |
+| cushion | bold | Ramp | 965.4 | 846.9 | 12.3% | 10.81 | 9.49 |
+| cushion | bold | Mountain | 878.9 | 735.8 | 16.3% | 9.84 | 8.24 |
 
 Thickness checks are separate. Volume reduction does not establish castability or the final selling price.

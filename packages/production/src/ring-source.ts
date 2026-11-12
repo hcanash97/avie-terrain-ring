@@ -39,12 +39,11 @@ export type RingConfiguration = {
   finish: "polished" | "satin";
 };
 
-type BakedMeta = { id: string; size: number; mPerPx: number; cx: number; cy: number; radiusM: number };
+type BakedMeta = { elevationStepM?: number; id: string; size: number; mPerPx: number; cx: number; cy: number; radiusM: number };
 const ROOT = resolve(import.meta.dirname, "../../..");
-const PRESET_LENGTH_M: Record<string, number> = {
-  "Snowdon, GB": 6000, "Ben Nevis, GB": 7000, "Matterhorn, CH": 6000, "Table Mountain, ZA": 8000,
-  "Mount Fuji, JP": 20000, "Grand Canyon, US": 16000, "Lake District, GB": 18000
-};
+const PRESET_LENGTH_M: Record<string, number> = Object.fromEntries(
+  (JSON.parse(readFileSync(resolve(ROOT, "terrain-ring/src/data/presets.json"), "utf8")) as {name: string; lengthM: number}[]).map((p) => [p.name, p.lengthM]),
+);
 
 /** Saved elevation for a preset (decimetres packed in R/G of a lossless PNG). */
 export function loadSavedTerrain(place: string): { source: TerrainSource; meta: BakedMeta; png: Buffer } {
@@ -56,7 +55,7 @@ export function loadSavedTerrain(place: string): { source: TerrainSource; meta: 
   const n = meta.size;
   const at = (x: number, y: number) => {
     const i = (Math.min(n - 1, Math.max(0, y)) * n + Math.min(n - 1, Math.max(0, x))) * 4;
-    return (img.data[i]! * 256 + img.data[i + 1]!) / 10;
+    return (img.data[i]! * 256 + img.data[i + 1]!) * (meta.elevationStepM ?? 0.1);
   };
   const source: TerrainSource = {
     radiusM: meta.radiusM,

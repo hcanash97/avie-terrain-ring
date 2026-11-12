@@ -1,17 +1,10 @@
+import presets from "../data/presets.json";
 import { create } from "zustand";
 import type { Detail } from "../three/terrain-surface";
 
 export type Place = { name: string; lat: number; lon: number; lengthM: number };
 
-export const PRESET_PLACES: Place[] = [
-  { name: "Snowdon, GB", lat: 53.0685, lon: -4.0763, lengthM: 6000 },
-  { name: "Ben Nevis, GB", lat: 56.7969, lon: -5.0036, lengthM: 7000 },
-  { name: "Matterhorn, CH", lat: 45.9763, lon: 7.6586, lengthM: 6000 },
-  { name: "Table Mountain, ZA", lat: -33.9628, lon: 18.4098, lengthM: 8000 },
-  { name: "Mount Fuji, JP", lat: 35.3606, lon: 138.7274, lengthM: 20000 },
-  { name: "Grand Canyon, US", lat: 36.0997, lon: -112.1124, lengthM: 16000 },
-  { name: "Lake District, GB", lat: 54.46, lon: -3.09, lengthM: 18000 }
-];
+export const PRESET_PLACES: Place[] = presets;
 
 type TerrainState = {
   place: Place;
