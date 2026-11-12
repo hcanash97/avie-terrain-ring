@@ -10,7 +10,7 @@ A browser configurator for À Vie Diamonds that turns real elevation data into a
 cd terrain-ring
 npm install
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
-npm test           # 185 geometry, terrain and material tests
+npm test           # 191 geometry, terrain and material tests
 npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
 node scripts/make-artifact.mjs   # single-page bundle in terrain-ring/artifact for Claude artifacts
 node scripts/bake-terrain.mjs    # re-bake saved terrain for the preset places
@@ -57,7 +57,7 @@ Latest external review: joins first, then proportions, then presentation. Keep t
    - The far-side nub is gone.
    - Outer-surface columns cluster at the edges, so edge rounding is resolved.
    - Shoulders leave the head less vertically.
-2. **Still open: faint vertical line at each head corner (¾ view).** Measured cause: the outer edge rounding always ends vertical, but in the shoulder zone the side wall below it slopes because of the taper, giving a 40–60° kink. Fix: end the edge rounding tangent to the actual wall slope for each cross-section. Do not hide it by raising `CREASE_ANGLE_DEG`. Two attempts that made it worse: a fast radius ramp under the corner (pinched) and a mid-shoulder radius swell (moved the line).
+2. **Fixed: head-corner edge/wall tangent.** The edge round follows the actual side-wall direction and width field, and outer/side-wall samples cluster at the join. Crease-normal threshold unchanged. Six geometric tangent regressions cover both head shapes and all shoulder styles; they fail on the previous generator. Checked Bar and Cushion in clay from fixed cameras. Continue with head bulk next.
 3. **Head bulk:** compare the Bar side elevation with the reference photos; consider a lower `headHeightMm` and a shorter vertical wall.
 4. **Soft or "liquid" terrain:** separate the causes before changing anything: elevation resolution (saved presets are about 38 m/px; live tiles are finer), smoothing (`DETAIL`), normals, and reflections. Don't turn sharpening back on.
 5. **Default camera:** raise it slightly so the landscape is visible immediately (`src/three/camera.ts`, `VIEWS` in `scene.ts`).

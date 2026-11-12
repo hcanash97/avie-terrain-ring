@@ -1,14 +1,19 @@
-# Head underside model: done (12 Nov 2026)
+# Head-corner tangent correction (12 Nov 2026)
 
-The head is now a vertical block with a rounded-rectangle footprint (L × W, corner radius r). It runs from the table down to an underside 3 mm below the table. Below that, the shoulders carry the ring; a 1.6 mm fillet joins the underside to the shoulders, and a 0.6 mm smooth-maximum fillet joins the head's end face to the shoulders. Side walls have 8 interior columns, so they follow the plan curves exactly instead of twisting.
+The README is the current task order. The earlier underside/nub notes in this file have been superseded by the continuous head width field.
 
-**Implemented in `src/geometry/ring-blank.ts`:** `footprint`, `widthAt`, `HEAD_BLOCK_DEPTH_MM`, `HEAD_UNDERSIDE_FILLET_MM` and `SHOULDER_FILLET_MM`.
+## Implemented
 
-**Head shapes:**
-- **Bar:** corner radius 0.8 / 1.0 / 1.2 mm.
-- **Cushion:** 10.5 × 9.5, 12 × 11 and 14 × 13 mm, with radius 2.5 / 3 / 3.5 mm.
+The outer edge round now moves toward the inner wall endpoint, rather than always pulling radially toward the ring centre. Across the round, a smootherstep correction follows the actual `widthAt` field. The start correction has zero derivative; the endpoint follows the tapered wall's width derivative. This removes the forced vertical tangent above a sloping wall.
 
-Both shapes are closed for every combination and match their footprints exactly (see MEASUREMENTS.md).
+Outer columns use sine spacing and side-wall columns cluster near the outer edge, so the mesh resolves the join without adding vertices. Terrain remains displaced vertically. The intentional terrain perimeter and `CREASE_ANGLE_DEG = 40` are unchanged.
 
-## Known remaining artefact
-A small nub is visible on the far inside edge at one end of the head in the Standard ¾ clay view, where the head underside meets the inner edge rounding. It is cosmetic at preview resolution; investigate before production export.
+## Verification
+
+- 191 tests pass, including six new actual surface-tangent checks for Bar/Cushion × all shoulder styles.
+- Those six checks fail on the previous generator (roughly 56–67 degrees at the worst sampled joins), and pass below 15 degrees with the correction.
+- Existing closure, dimensions, proportions, terrain and material tests pass.
+- TypeScript and production build pass.
+- Visually inspected Standard Bar in three-quarter/front clay views and Standard Cushion in three-quarter clay view.
+
+These are preview checks, not proof of self-intersection freedom or casting suitability. Next: assess head bulk against the reference side views.

@@ -246,28 +246,43 @@ export function createRingMesh(p: RingParameters): RingMesh {
     return BAND_EDGE_RADIUS_MM;
   };
 
-  const pullIn = (x: number, y: number, z: number, amount: number): Vec3 => {
-    const n = Math.hypot(x, y);
-    return [x - (amount * x) / n, y - (amount * y) / n, z];
-  };
-
   /** Outer surface point. withTerrain=false gives the bare head (side-wall subdivision). */
   const outerPoint = (row: Row, z: number, withTerrain: boolean): Vec3 => {
     const h = halfWidth(row);
     const pull = edgePull(z, h, edgeRadius(row));
+    /**
+     * Bend the quarter-round onto the actual tapered wall. At the start of the
+     * round the correction and its derivative are zero. At its end the ordinary
+     * quarter-circle has zero width derivative with respect to radial depth;
+     * following widthAt there makes its tangent agree with the wall below.
+     * Keeping z=h at the endpoint instead creates a vertical tangent followed
+     * by the sloping wall (the visible line at each head corner).
+     */
+    const rounded = (x: number, y: number): Vec3 => {
+      const innerH = innerHalfWidth(row);
+      const innerR = innerRadius(Math.sign(z) * innerH, innerH);
+      const dx = -innerR * Math.sin(row.alpha) - x;
+      const dy = innerR * Math.cos(row.alpha) - y;
+      const length = Math.hypot(dx, dy);
+      const point: Vec3 = [x + pull * dx / length, y + pull * dy / length, z];
+      const radius = Math.min(edgeRadius(row), h * 0.4);
+      const progress = radius > 0 ? (Math.abs(z) - (h - radius)) / radius : 0;
+      point[2] += Math.sign(z) * smootherstep(progress) * (widthAt(point[0], point[1], row) - h);
+      return point;
+    };
     switch (row.kind) {
       case "face": {
         const lift = withTerrain ? terrainLift(row.x, z) : 0;
-        const [x, y] = pullIn(row.x, yTop, z, pull);
-        return [x, y + lift, z];
+        const point = rounded(row.x, yTop);
+        point[1] += lift;
+        return point;
       }
       case "wall": {
-        const [x, y] = pullIn((row.side * L) / 2, yTop, z, pull);
-        return [x, y, z];
+        return rounded((row.side * L) / 2, yTop);
       }
       case "shoulder": {
         const [x, y] = shoulderXY(row.side, row.t, z, h);
-        return pullIn(x, y, z, pull);
+        return rounded(x, y);
       }
       case "band": {
         const r = bandOuterRadius(z) - pull;
@@ -348,10 +363,10 @@ export function createRingMesh(p: RingParameters): RingMesh {
     const h = halfWidth(row);
     if (k === 0) return -h; // exact, so edges coincide bit-for-bit with the side walls
     if (k === columns - 1) return h;
-    // Columns cluster towards the edges (part-sine spacing) so the edge rounding is
+    // Columns cluster towards the edges (sine spacing) so the edge rounding is
     // actually resolved by the mesh instead of collapsing into one ~45° facet.
     const u = -1 + (2 * k) / (columns - 1);
-    return h * (0.25 * u + 0.75 * Math.sin((u * Math.PI) / 2));
+    return h * Math.sin((u * Math.PI) / 2);
   };
   const innerPoint = (row: Row, z: number): Vec3 => {
     const r = innerRadius(z, innerHalfWidth(row));
@@ -378,7 +393,8 @@ export function createRingMesh(p: RingParameters): RingMesh {
       if (k === 0) return inner;
       if (k === wallColumns - 2) return bare;
       if (k === wallColumns - 1) return outerPoint(row, side * halfWidth(row), true);
-      const f = k / (wallColumns - 2);
+      // Resolve the wall tangent just below the round without adding vertices.
+      const f = 1 - (1 - k / (wallColumns - 2)) ** 3;
       const x = inner[0] + (bare[0] - inner[0]) * f;
       const y = inner[1] + (bare[1] - inner[1]) * f;
       return [x, y, side * widthAt(x, y, row)];
