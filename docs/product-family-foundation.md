@@ -1,3 +1,5 @@
+> Milestone 2 is now implemented: see [shared engine guide](shared-terrain-engine.md). References below to shared extraction as next work describe the original Milestone 1 handoff.
+
 # Product-family foundation (Milestone 1)
 
 Implemented locally, November 2026. The existing browser configurator and hosted preview are unchanged. No live API, remote database, infrastructure account, Shopify product, price, checkout or new geometry generator was created.

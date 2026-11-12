@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createScene, type SceneContext, type ViewName } from "../three/scene";
-import { buildTerrain, frameFor } from "../three/terrain-surface";
 import { LOD, type Quality } from "../three/performance";
-import { createRingMesh, facePreset, meshVolume, METAL_DENSITY_G_CM3 } from "../geometry/ring-blank";
+import { generateTerrainRingPreview, facePreset, meshVolume, METAL_DENSITY_G_CM3 } from "../geometry/ring-blank";
 import { getInnerDiameterMm } from "../geometry/ring-sizing";
 import type { TerrainSource } from "../geometry/heightmap";
 import { useRingStore } from "../state/ringStore";
@@ -81,19 +80,17 @@ export function RingViewer({ source, onStats }: Props) {
     const build = (lod: (typeof LOD)[keyof typeof LOD]) => {
       const started = performance.now();
       const preset = facePreset(weight, headShape);
-      const terrain = buildTerrain(
+      const { terrain, mesh } = generateTerrainRingPreview({
         source,
-        frameFor(place.lengthM, bearingDeg, preset),
-        preset,
-        { terrainHeight, detail },
-        lod.cols
-      );
-      const mesh = createRingMesh({
+        lengthM: place.lengthM,
+        bearingDeg,
+        terrainHeight,
+        detail,
+        flat,
         innerDiameterMm: getInnerDiameterMm(ringSize ?? PREVIEW_SIZE),
         weight: preset,
         shoulder,
         profile,
-        terrain: flat ? null : terrain,
         resolution: lod
       });
       sceneRef.current?.setRing(mesh);

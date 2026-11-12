@@ -1,0 +1,21 @@
+{
+  "name": "@avie/terrain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./heightmap": "./src/heightmap.ts",
+    "./processing": "./src/processing.ts",
+    "./edge-falloff": "./src/edge-falloff.ts",
+    "./server": {
+      "browser": null,
+      "default": "./src/server.ts"
+    },
+    "./snapshot": "./src/snapshot.ts"
+  },
+  "dependencies": {
+    "@avie/shared-types": "*",
+    "zod": "^4.6.7"
+  }
+}

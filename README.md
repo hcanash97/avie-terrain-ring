@@ -11,8 +11,9 @@ Sign in with the ChatGPT account that owns this Site. Hosting is independent of 
 ## Run it
 
 ```bash
+npm ci             # shared workspace dependencies, from the repository root
 cd terrain-ring
-npm install
+npm ci
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
 npm test           # 396 geometry, terrain, map and material tests
 npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
@@ -84,3 +85,7 @@ Latest external review: joins first, then proportions, then presentation. Keep t
 ## Product-family foundation
 
 The new workspace packages implement reusable terrain/configuration snapshots, a nine-product registry, provisional mount constraints and a local Drizzle/PostgreSQL schema. The existing ring app remains in `terrain-ring/`. See [Milestone 1 guide](docs/product-family-foundation.md) for commands, tests and current limitations. Pendant/Signet geometry, live APIs and production exports are later milestones.
+
+## Shared terrain engine (Milestone 2)
+
+Terrain processing and the ring generator now live in `packages/terrain` and `packages/geometry`. The viewer uses an adapter, with frozen 486-case regression coverage against the original engine. See [shared engine guide](docs/shared-terrain-engine.md). Clone/build the complete repository; production `terrain-ring/dist` is still standalone.
