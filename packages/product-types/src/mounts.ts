@@ -23,7 +23,7 @@ export function resolveMount(input: unknown) {
       faceShape: s.options.headShape,
       heightMm: dimensions[i]![0],
       widthMm: dimensions[i]![1],
-      substrateMm: 1.2,
+      substrateMm: 0.9,
       reliefLimitMm: [2, 2.4, 2.8][i],
       crop: c.crop,
       units: "mm",

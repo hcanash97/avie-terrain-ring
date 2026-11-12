@@ -39,15 +39,17 @@ export type WeightPreset = {
 };
 
 export const WEIGHTS: Record<Weight, WeightPreset> = {
-  // Width-led presets: substrate height and band thickness are shared. Terrain
-  // provides the remaining height; cross-section clearance is checked separately.
+  // Width-led, slim cast-signet proportions: every face size shares a 1.2 mm band
+  // and a 0.9 mm substrate under the terrain, measured against the reference
+  // front view (band ~1.1–1.2 mm, plate under 1 mm). Face size changes width
+  // only. Structural minimums are checked in createRingMesh.
   slim: {
     label: "Slim",
     faceLengthMm: 12,
     faceWidthMm: 5.5,
-    headHeightMm: 1.2,
+    headHeightMm: 0.9,
     bandWidthMm: 2.4,
-    bandThicknessMm: 1.5,
+    bandThicknessMm: 1.2,
     maxReliefMm: 2.0,
     cornerRadiusMm: 0.8,
   },
@@ -55,9 +57,9 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     label: "Standard",
     faceLengthMm: 13,
     faceWidthMm: 7.5,
-    headHeightMm: 1.2,
+    headHeightMm: 0.9,
     bandWidthMm: 3.0,
-    bandThicknessMm: 1.5,
+    bandThicknessMm: 1.2,
     maxReliefMm: 2.4,
     cornerRadiusMm: 1.0,
   },
@@ -65,9 +67,9 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     label: "Bold",
     faceLengthMm: 14,
     faceWidthMm: 10,
-    headHeightMm: 1.2,
+    headHeightMm: 0.9,
     bandWidthMm: 4.0,
-    bandThicknessMm: 1.5,
+    bandThicknessMm: 1.2,
     maxReliefMm: 2.8,
     cornerRadiusMm: 1.2,
   },
@@ -248,7 +250,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
     rIn +
     Math.max(
       w.headHeightMm,
-      (p.constraints?.minHeadRadialMm ?? 1.0) + HEAD_EDGE_RADIUS_MM,
+      p.constraints?.minHeadRadialMm ?? 0.8,
     );
   const shoulder = SHOULDERS[p.shoulder];
   const cornerAngle = Math.atan2(L / 2, yTop);
@@ -266,14 +268,16 @@ export function createRingMesh(p: RingParameters): RingMesh {
 
   // --- 2. Band cross-section ----------------------------------------------
   const bandHalf = w.bandWidthMm / 2;
-  const minimumBand = p.constraints?.minBandRadialMm ?? 0.7;
-  if (
-    w.bandThicknessMm <
-    minimumBand + INNER_EDGE_RADIUS_MM + BAND_EDGE_RADIUS_MM + COMFORT_MM
-  ) {
-    throw new Error(
-      "Band thickness cannot support the rounded cross-section clearance",
-    );
+  // Structural guard. Measures metal that actually exists: solid metal at the
+  // centre line (thickness less the comfort dome), and edge rounds that fit
+  // within the thickness. (The edge rounds sit at the band's sides, so they are
+  // not subtracted from the centre-line thickness.)
+  const minimumBand = p.constraints?.minBandRadialMm ?? 0.9;
+  if (w.bandThicknessMm - COMFORT_MM < minimumBand) {
+    throw new Error("Band is thinner than the minimum solid metal at its centre line");
+  }
+  if (INNER_EDGE_RADIUS_MM + BAND_EDGE_RADIUS_MM > w.bandThicknessMm) {
+    throw new Error("Band edge rounds do not fit within the band thickness");
   }
   const bandOuterRadius = (z: number) => {
     const u = Math.min(1, Math.abs(z / bandHalf));
