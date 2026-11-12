@@ -39,6 +39,9 @@ export type WeightPreset = {
 };
 
 export const WEIGHTS: Record<Weight, WeightPreset> = {
+  // Bar corners are tight (0.35–0.45 mm) so the shoulder starts almost as wide as
+  // the head: larger plan corners narrow the head's end face, and the wider head
+  // then shows as "ears" behind the shoulder in side view.
   // Width-led, slim cast-signet proportions: every face size shares a 1.2 mm band
   // and a 0.9 mm substrate under the terrain, measured against the reference
   // front view (band ~1.1–1.2 mm, plate under 1 mm). Face size changes width
@@ -51,7 +54,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     bandWidthMm: 2.0,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.0,
-    cornerRadiusMm: 0.8,
+    cornerRadiusMm: 0.35,
   },
   standard: {
     label: "Standard",
@@ -61,7 +64,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     bandWidthMm: 2.2,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.4,
-    cornerRadiusMm: 1.0,
+    cornerRadiusMm: 0.4,
   },
   bold: {
     label: "Bold",
@@ -71,7 +74,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     bandWidthMm: 2.6,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.8,
-    cornerRadiusMm: 1.2,
+    cornerRadiusMm: 0.45,
   },
 };
 
@@ -132,8 +135,8 @@ const INNER_EDGE_RADIUS_MM = 0.25;
  *   - END_BLEND_MM: beyond each end of the face the head width eases into the
  *     shoulder over this distance (no near-vertical end face, so no crease).
  */
-const HEAD_WALL_MM = 0.35;
-const HEAD_TAPER_MM = 2.2;
+const HEAD_WALL_MM = 0.2; // just longer than the 0.15 mm edge round, so the full face width is reached
+const HEAD_TAPER_MM = 3.6;
 const END_BLEND_MM = 2.4;
 /** Interior columns on each side wall, so walls follow the blend's curves exactly. */
 const SIDE_WALL_STEPS = 10;
@@ -395,7 +398,10 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const taperBottom = yTop - HEAD_WALL_MM - HEAD_TAPER_MM;
   const widthAt = (x: number, y: number, row: Row) => {
     const s = shoulderHalf(row);
-    const down = smootherstep((y - taperBottom) / HEAD_TAPER_MM);
+    // Concave flare from just under the table edge (u^1.4, as the classic
+    // shoulder): tapers immediately at the top, arrives smoothly at the bottom.
+    // An S-curve here held full width for ~1 mm and read as a lip in side view.
+    const down = Math.min(1, Math.max(0, (y - taperBottom) / HEAD_TAPER_MM)) ** 1.4;
     const beyond = Math.abs(x) - L / 2;
     const along = beyond <= 0 ? 1 : 1 - smootherstep(beyond / END_BLEND_MM);
     return s + Math.max(0, footprint(x) - s) * down * along;
