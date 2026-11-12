@@ -48,7 +48,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     faceLengthMm: 12,
     faceWidthMm: 5.5,
     headHeightMm: 0.9,
-    bandWidthMm: 2.4,
+    bandWidthMm: 2.0,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.0,
     cornerRadiusMm: 0.8,
@@ -58,7 +58,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     faceLengthMm: 13,
     faceWidthMm: 7.5,
     headHeightMm: 0.9,
-    bandWidthMm: 3.0,
+    bandWidthMm: 2.2,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.4,
     cornerRadiusMm: 1.0,
@@ -68,7 +68,7 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
     faceLengthMm: 14,
     faceWidthMm: 10,
     headHeightMm: 0.9,
-    bandWidthMm: 4.0,
+    bandWidthMm: 2.6,
     bandThicknessMm: 1.2,
     maxReliefMm: 2.8,
     cornerRadiusMm: 1.2,
@@ -148,7 +148,10 @@ const smootherstep = (x: number) => {
  * Shoulder styles, defined by the side-profile tangents and how the width eases.
  *   span: angle (rad) from the head corner to where the shoulder joins the band.
  *   startTangent / endTangent: Hermite tangent lengths as multiples of the chord.
- *   width(t): 0 at the head → 1 at the band.
+ *   flare(u): shoulder width as a function of HEIGHT, u = 1 at the head, 0 where
+ *     the shoulder meets the band. Defining width by height (not by the curve
+ *     parameter) gives the continuous, trumpet-like taper of the reference side
+ *     elevation instead of a neck under the head.
  */
 const SHOULDERS: Record<
   ShoulderStyle,
@@ -156,27 +159,28 @@ const SHOULDERS: Record<
     span: number;
     startTangent: number;
     endTangent: number;
-    width: (t: number) => number;
+    flare: (u: number) => number;
   }
 > = {
   // Shorter start tangents turn the shoulder outward sooner, so less vertical wall shows under the head.
+  // Longer spans let the taper run most of the way down the side of the ring.
   straight: {
-    span: 0.58,
+    span: 0.95,
     startTangent: 0.5,
     endTangent: 0.8,
-    width: easedLinear,
+    flare: easedLinear, // even taper
   },
   classic: {
-    span: 0.62,
+    span: 1.0,
     startTangent: 0.6,
     endTangent: 1.0,
-    width: (t) => smootherstep(t) ** 2.0,
-  }, // broad, then eases in
+    flare: (u) => u ** 1.4, // gently concave: the reference's trumpet flare
+  },
   curved: {
-    span: 0.72,
+    span: 1.1,
     startTangent: 0.75,
     endTangent: 0.7,
-    width: (t) => smootherstep(t) ** 1.1,
+    flare: (u) => u ** 2, // pronounced flare just under the head
   },
 };
 
@@ -365,8 +369,14 @@ export function createRingMesh(p: RingParameters): RingMesh {
   };
   /** The shoulder's own half-width at this cross-section. */
   const shoulderHalf = (row: Row) => {
-    if (row.kind === "shoulder")
-      return endHalf + (bandHalf - endHalf) * shoulder.width(row.t);
+    if (row.kind === "shoulder") {
+      // Width by the shoulder centre-line's height: head width at the top, band
+      // width where the shoulder meets the band. (Hermite y is independent of h.)
+      const y = shoulderXY(row.side, row.t, 0, 1)[1];
+      const yLow = bandOuterRadius(0) * Math.cos(bandAngle);
+      const u = Math.min(1, Math.max(0, (y - yLow) / (yTop - yLow)));
+      return bandHalf + (endHalf - bandHalf) * shoulder.flare(u);
+    }
     if (row.kind === "band") return bandHalf;
     // Carry more of a broad face into its supporting side wall. Previously
     // every face row inherited the narrow flat-end width of the rounded head,
