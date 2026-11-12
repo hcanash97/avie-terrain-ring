@@ -1,3 +1,5 @@
+> Current implementation: see [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md). Its Terra dimensions, collar behaviour and validation status supersede conflicting historical guidance below.
+
 # Approved preview look (12 Nov 2026)
 
 These are preview renders, tuned by fixed-camera captures and pixel statistics. They are not physical material specifications; confirm against photographed cast samples before launch.

@@ -1,0 +1,110 @@
+[
+  {
+    "shape": "bar",
+    "weight": "slim",
+    "fixture": "Flat",
+    "volumeMm3": 312.99382829605594
+  },
+  {
+    "shape": "bar",
+    "weight": "slim",
+    "fixture": "Ramp",
+    "volumeMm3": 358.7935625039142
+  },
+  {
+    "shape": "bar",
+    "weight": "slim",
+    "fixture": "Mountain",
+    "volumeMm3": 342.1485623015654
+  },
+  {
+    "shape": "bar",
+    "weight": "standard",
+    "fixture": "Flat",
+    "volumeMm3": 484.0046727238536
+  },
+  {
+    "shape": "bar",
+    "weight": "standard",
+    "fixture": "Ramp",
+    "volumeMm3": 565.1614934832398
+  },
+  {
+    "shape": "bar",
+    "weight": "standard",
+    "fixture": "Mountain",
+    "volumeMm3": 531.3571632183057
+  },
+  {
+    "shape": "bar",
+    "weight": "bold",
+    "fixture": "Flat",
+    "volumeMm3": 757.6356537204525
+  },
+  {
+    "shape": "bar",
+    "weight": "bold",
+    "fixture": "Ramp",
+    "volumeMm3": 893.5944319644497
+  },
+  {
+    "shape": "bar",
+    "weight": "bold",
+    "fixture": "Mountain",
+    "volumeMm3": 829.89230845295
+  },
+  {
+    "shape": "cushion",
+    "weight": "slim",
+    "fixture": "Flat",
+    "volumeMm3": 369.5371071734248
+  },
+  {
+    "shape": "cushion",
+    "weight": "slim",
+    "fixture": "Ramp",
+    "volumeMm3": 435.5869773654527
+  },
+  {
+    "shape": "cushion",
+    "weight": "slim",
+    "fixture": "Mountain",
+    "volumeMm3": 401.8273110436199
+  },
+  {
+    "shape": "cushion",
+    "weight": "standard",
+    "fixture": "Flat",
+    "volumeMm3": 526.2180147410842
+  },
+  {
+    "shape": "cushion",
+    "weight": "standard",
+    "fixture": "Ramp",
+    "volumeMm3": 630.5790834286189
+  },
+  {
+    "shape": "cushion",
+    "weight": "standard",
+    "fixture": "Mountain",
+    "volumeMm3": 577.116819014887
+  },
+  {
+    "shape": "cushion",
+    "weight": "bold",
+    "fixture": "Flat",
+    "volumeMm3": 797.4343653745012
+  },
+  {
+    "shape": "cushion",
+    "weight": "bold",
+    "fixture": "Ramp",
+    "volumeMm3": 965.4454715125863
+  },
+  {
+    "shape": "cushion",
+    "weight": "bold",
+    "fixture": "Mountain",
+    "volumeMm3": 878.8587218673819
+  }
+]

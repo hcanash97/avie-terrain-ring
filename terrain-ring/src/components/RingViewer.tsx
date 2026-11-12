@@ -8,7 +8,7 @@ import type { TerrainSource } from "../geometry/heightmap";
 import { useRingStore } from "../state/ringStore";
 import { useTerrainStore } from "../state/terrainStore";
 
-export type PreviewStats = { triangles: number; ms: number; massG: number; exaggeration: number; rangeM: number };
+export type PreviewStats = { triangles: number; ms: number; massG: number; exaggeration: number; rangeM: number; terrainAdjusted: boolean };
 
 type Props = { source: TerrainSource; onStats: (s: PreviewStats) => void };
 
@@ -19,14 +19,34 @@ export function RingViewer({ source, onStats }: Props) {
   const sceneRef = useRef<SceneContext | null>(null);
   const [quality, setQuality] = useState<Quality>("high");
   const [simplified, setSimplified] = useState(false);
+  const [sceneVersion, setSceneVersion] = useState(0);
+  const [contextLost, setContextLost] = useState(false);
   const { metal, finish, weight, headShape, shoulder, profile, ringSize, clay } = useRingStore();
   const { place, bearingDeg, terrainHeight, detail, dragging, flat } = useTerrainStore();
   const [view, setView] = useState<ViewName>("three_quarter");
 
   useEffect(() => {
+    const stage = containerRef.current?.parentElement;
+    if (!stage) return;
+    const heading = stage.querySelector<HTMLElement>(".stage-head");
+    const foot = stage.querySelector<HTMLElement>(".stage-foot");
+    const measure = () => {
+      stage.style.setProperty("--viewer-top", `${(heading?.offsetTop ?? 20) + (heading?.offsetHeight ?? 100) + 12}px`);
+      stage.style.setProperty("--viewer-bottom", `${(foot?.offsetHeight ?? 40) + 86}px`);
+    };
+    const observer = new ResizeObserver(measure);
+    if (heading) observer.observe(heading);
+    if (foot) observer.observe(foot);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!containerRef.current) return;
     const context = createScene(containerRef.current, {
       pixelRatioCap: 2,
+      onContextLost: () => setContextLost(true),
+      onContextRestored: () => { setContextLost(false); setSceneVersion((v) => v + 1); },
       onFps: (fps) => {
         if (fps < 30) {
           setQuality("low");
@@ -39,15 +59,17 @@ export function RingViewer({ source, onStats }: Props) {
       context.dispose();
       sceneRef.current = null;
     };
-  }, []);
+  }, [sceneVersion, createScene]);
+
+  useEffect(() => { sceneRef.current?.setView(view); }, [view, sceneVersion]);
 
   useEffect(() => {
     sceneRef.current?.setMaterial(metal, finish);
-  }, [metal, finish]);
+  }, [metal, finish, sceneVersion]);
 
   useEffect(() => {
     sceneRef.current?.setClay(clay);
-  }, [clay]);
+  }, [clay, sceneVersion]);
 
   useEffect(() => {
     const build = (lod: (typeof LOD)[keyof typeof LOD]) => {
@@ -73,8 +95,9 @@ export function RingViewer({ source, onStats }: Props) {
         triangles: mesh.triangleCount,
         ms: Math.round(performance.now() - started),
         massG: (meshVolume(mesh) / 1000) * METAL_DENSITY_G_CM3[metal],
-        exaggeration: terrain.exaggeration,
-        rangeM: terrain.rangeM
+        exaggeration: flat ? 0 : terrain.exaggeration,
+        rangeM: flat ? 0 : terrain.rangeM,
+        terrainAdjusted: mesh.terrainAdapted
       });
     };
     if (dragging) {
@@ -83,14 +106,17 @@ export function RingViewer({ source, onStats }: Props) {
     }
     const id = setTimeout(() => build(quality === "low" ? LOD.low : LOD.high), 100);
     return () => clearTimeout(id);
-  }, [source, place.lengthM, bearingDeg, terrainHeight, detail, weight, headShape, shoulder, profile, ringSize, metal, dragging, quality, onStats, flat]);
+  }, [source, place.lengthM, bearingDeg, terrainHeight, detail, weight, headShape, shoulder, profile, ringSize, metal, dragging, quality, onStats, flat, sceneVersion]);
 
   const VIEW_LABELS: [ViewName, string][] = [["three_quarter", "¾"], ["front", "Front"], ["side", "Side"], ["top", "Top"]];
 
   return (
     <>
-      <div ref={containerRef} className="viewer" aria-label="3D preview of your ring. Drag to rotate, pinch or scroll to zoom." />
+      <div ref={containerRef} className="viewer" aria-label="3D preview of your Terra ring. Drag to rotate. Use the zoom buttons to change scale." />
       <div className="view-bar" role="group" aria-label="Camera views">
+        <button title="Rebuild lighting and materials without changing your design" onClick={() => { setContextLost(false); setSceneVersion((v) => v + 1); }}>Reset preview</button>
+        <button aria-label="Zoom out" onClick={() => sceneRef.current?.zoom(1.18)}>−</button>
+        <button aria-label="Zoom in" onClick={() => sceneRef.current?.zoom(0.85)}>+</button>
         {VIEW_LABELS.map(([v, label]) => (
           <button
             key={v}
@@ -103,8 +129,15 @@ export function RingViewer({ source, onStats }: Props) {
           </button>
         ))}
       </div>
+      {import.meta.env.DEV && <details className="dev-inspection">
+        <summary>Inspect shape</summary>
+        <label><input type="checkbox" checked={clay} onChange={(e) => useRingStore.getState().set({ clay: e.target.checked })} /> Clay</label>
+        <label><input type="checkbox" checked={flat} onChange={(e) => useTerrainStore.getState().set({ flat: e.target.checked })} /> Flat terrain</label>
+        <button onClick={() => sceneRef.current?.simulateContextRecovery()}>Test GPU recovery</button>
+      </details>}
+      {contextLost && <div className="notice" role="status">Restoring the 3D preview… Your design is retained.</div>}
       {simplified && (
-        <div className="notice">We’ve simplified the preview to keep everything running smoothly. Your finished ring will include the full level of detail.</div>
+        <div className="notice">Preview detail reduced to keep rotation smooth.</div>
       )}
     </>
   );

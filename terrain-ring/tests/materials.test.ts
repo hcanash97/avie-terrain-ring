@@ -19,4 +19,15 @@ describe("materials", () => {
     m.dispose();
     expect(disposed).toBe(true);
   });
+  it("reapplying the selected alloy restores physical material settings", () => {
+    const m = createRingMaterial("silver_925", "polished");
+    m.metalness = 0;
+    m.envMapIntensity = 0;
+    applyRingMaterial(m, "gold_18ct", "satin");
+    expect(m.metalness).toBe(1);
+    expect(m.envMapIntensity).toBe(0.95);
+    expect(m.color.getHex()).toBe(METALS.gold_18ct.color);
+    expect(m.userData.terraFinish.body.value).toBe(FINISH_ROUGHNESS.satin);
+    m.dispose();
+  });
 });

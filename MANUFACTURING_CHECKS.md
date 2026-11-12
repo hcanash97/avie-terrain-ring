@@ -1,3 +1,5 @@
+> Current implementation: see [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md). Its Terra dimensions, collar behaviour and validation status supersede conflicting historical guidance below.
+
 # What the tests prove, and what they don't
 
 Status after the visual pass of 12 November 2026.

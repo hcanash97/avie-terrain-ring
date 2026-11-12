@@ -54,7 +54,7 @@ export function StepReview({ stats, showCartMessage }: { stats: PreviewStats | n
       </ul>
 
       {showCartMessage && (
-        <p className="cart-note" role="status">Checkout isn’t connected in this preview yet, so nothing has been sent.</p>
+        <p className="cart-note" role="status">Nothing has been sent. Contact us to discuss this design and receive a written quote.</p>
       )}
 
       <div className="contact">

@@ -1,3 +1,5 @@
+> Current implementation: see [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md). Its Terra dimensions, collar behaviour and validation status supersede conflicting historical guidance below.
+
 # Head-corner tangent correction (12 Nov 2026)
 
 The README is the current task order. The earlier underside/nub notes in this file have been superseded by the continuous head width field.

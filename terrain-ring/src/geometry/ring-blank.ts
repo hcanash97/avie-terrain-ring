@@ -10,9 +10,9 @@
  *   2. Band cross-section: width, thickness and profile (flat / comfort / D).
  *   3. Head: a rectangular block, exactly faceLength × faceWidth, with a flat
  *      table at innerRadius + headHeight. The landscape is displaced straight up
- *      on the table and stays on the head; its perimeter is a readable edge.
+ *      on the table; boundary ridges continue through a short shoulder collar.
  *   4. Shoulders: cubic Hermite curves that control both position AND tangent
- *      at each end: they leave the head's end wall heading straight down and
+ *      at each end: they leave the terrain base heading outward and
  *      arrive at the band along the band's own tangent, so there is no slope
  *      break. Width eases from the face width to the band width.
  * Changing the finger size rebuilds the opening and the shoulder connection; the
@@ -38,11 +38,11 @@ export type WeightPreset = {
 };
 
 export const WEIGHTS: Record<Weight, WeightPreset> = {
-  // The plateau sits only ~0.5 mm above the band; the landscape supplies the
-  // rest of the head's height, so the ridgeline forms the silhouette.
-  slim: { label: "Slim", faceLengthMm: 12, faceWidthMm: 5.5, headHeightMm: 1.9, bandWidthMm: 2.4, bandThicknessMm: 1.5, maxReliefMm: 2.0, cornerRadiusMm: 0.8 },
-  standard: { label: "Standard", faceLengthMm: 13, faceWidthMm: 7.5, headHeightMm: 2.1, bandWidthMm: 3.0, bandThicknessMm: 1.7, maxReliefMm: 2.4, cornerRadiusMm: 1.0 },
-  bold: { label: "Bold", faceLengthMm: 14, faceWidthMm: 10, headHeightMm: 2.4, bandWidthMm: 4.0, bandThicknessMm: 1.9, maxReliefMm: 2.8, cornerRadiusMm: 1.2 }
+  // Width-led presets: substrate height and band thickness are shared. Terrain
+  // provides the remaining height; cross-section clearance is checked separately.
+  slim: { label: "Slim", faceLengthMm: 12, faceWidthMm: 5.5, headHeightMm: 1.2, bandWidthMm: 2.4, bandThicknessMm: 1.5, maxReliefMm: 2.0, cornerRadiusMm: 0.8 },
+  standard: { label: "Standard", faceLengthMm: 13, faceWidthMm: 7.5, headHeightMm: 1.2, bandWidthMm: 3.0, bandThicknessMm: 1.5, maxReliefMm: 2.4, cornerRadiusMm: 1.0 },
+  bold: { label: "Bold", faceLengthMm: 14, faceWidthMm: 10, headHeightMm: 1.2, bandWidthMm: 4.0, bandThicknessMm: 1.5, maxReliefMm: 2.8, cornerRadiusMm: 1.2 }
 };
 
 /** Cushion (rounded-square) heads: same band and head height per size, broader face, larger corners. */
@@ -73,6 +73,7 @@ export type RingParameters = {
   shoulder: ShoulderStyle;
   profile: BandProfile;
   terrain: TerrainInput | null;
+  constraints?: { minHeadRadialMm?: number; minBandRadialMm?: number };
   resolution: { faceSegments: number; backSegments: number; widthSegments: number };
 };
 
@@ -84,15 +85,18 @@ export type RingMesh = {
   /** The first faceTriangleCount triangles in `indices` are the terrain face (its own finish zone). */
   faceTriangleCount: number;
   triangleCount: number;
+  /** Continuous terrain-finish weight, fading into polished shoulders. */
+  terrainBlend: Float32Array;
+  terrainAdapted: boolean;
 };
 
-/** Small lift so the block always has a crisp edge, even on flat ground. */
-const BLOCK_BASE_MM = 0.12;
+/** No universal pedestal lift: the support surface supplies the substrate. */
+const BLOCK_BASE_MM = 0;
 /** Long edges of the head top: small, controlled rounding that keeps the perimeter readable. */
 const HEAD_EDGE_RADIUS_MM = 0.15;
 /** Band and lower shoulder edges: soft, polished. */
-const BAND_EDGE_RADIUS_MM = 0.45;
-const INNER_EDGE_RADIUS_MM = 0.35;
+const BAND_EDGE_RADIUS_MM = 0.30;
+const INNER_EDGE_RADIUS_MM = 0.25;
 /**
  * Head-to-shoulder blend (one continuous width field, no attached block):
  *   - HEAD_WALL_MM: the head keeps its full footprint for this depth under the
@@ -102,12 +106,12 @@ const INNER_EDGE_RADIUS_MM = 0.35;
  *   - END_BLEND_MM: beyond each end of the face the head width eases into the
  *     shoulder over this distance (no near-vertical end face, so no crease).
  */
-const HEAD_WALL_MM = 1.0;
-const HEAD_TAPER_MM = 2.8;
-const END_BLEND_MM = 1.6;
+const HEAD_WALL_MM = 0.35;
+const HEAD_TAPER_MM = 2.2;
+const END_BLEND_MM = 2.4;
 /** Interior columns on each side wall, so walls follow the blend's curves exactly. */
 const SIDE_WALL_STEPS = 10;
-const COMFORT_MM = 0.25;
+const COMFORT_MM = 0.12;
 
 const smootherstep = (x: number) => {
   const t = Math.min(1, Math.max(0, x));
@@ -122,10 +126,33 @@ const smootherstep = (x: number) => {
  */
 const SHOULDERS: Record<ShoulderStyle, { span: number; startTangent: number; endTangent: number; width: (t: number) => number }> = {
   // Shorter start tangents turn the shoulder outward sooner, so less vertical wall shows under the head.
-  straight: { span: 0.55, startTangent: 0.25, endTangent: 0.35, width: (t) => t },
-  classic: { span: 0.62, startTangent: 0.55, endTangent: 1.0, width: (t) => smootherstep(t) ** 1.6 }, // broad, then eases in
-  curved: { span: 0.75, startTangent: 0.85, endTangent: 0.7, width: (t) => smootherstep(t) ** 0.8 }
+  straight: { span: 0.58, startTangent: 0.5, endTangent: 0.8, width: easedLinear },
+  classic: { span: 0.62, startTangent: 0.6, endTangent: 1.0, width: (t) => smootherstep(t) ** 1.6 }, // broad, then eases in
+  curved: { span: 0.72, startTangent: 0.75, endTangent: 0.7, width: (t) => smootherstep(t) ** 0.8 }
 };
+
+/** Straight in the middle, zero width derivative at both ends. */
+export function easedLinear(t: number): number {
+  const u = Math.max(0, Math.min(1, t)), ease = 0.18;
+  if (u < ease) return u * u / (2 * ease * (1 - ease));
+  if (u > 1 - ease) return 1 - (1 - u) ** 2 / (2 * ease * (1 - ease));
+  return (u - ease / 2) / (1 - ease);
+}
+
+/** Boundary-height and outward-slope continuation, fading to zero with zero slope.
+ * The derivative limiter prevents a steep edge valley from creating an undercut.
+ * Input is already rotated geographic terrain; no invented or random veins.
+ */
+export function terrainCollar(terrain: TerrainInput | null, length: number, width: number, side: 1 | -1, z: number, distance: number, collarLength: number) {
+  const sample = (x: number) => BLOCK_BASE_MM + (terrain ? sampleBilinear(terrain.data, terrain.cols, terrain.rows, x / length + 0.5, z / width + 0.5) * terrain.reliefMm : 0);
+  const height = sample(side * length / 2);
+  const probe = Math.min(0.12, length / 20);
+  const slope = (height - sample(side * (length / 2 - probe))) / probe;
+  const tangent = Math.max(-3 * height, Math.min(3 * height, slope * collarLength));
+  const u = Math.max(0, Math.min(1, distance / collarLength));
+  const lift = height * (2 * u ** 3 - 3 * u * u + 1) + tangent * (u ** 3 - 2 * u * u + u);
+  return { lift: Math.max(0, lift), blend: 1 - smootherstep(u), slopeLimited: Math.abs(tangent - slope * collarLength) > 1e-6 };
+}
 
 type Vec3 = [number, number, number];
 /**
@@ -143,7 +170,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const L = w.faceLengthMm;
   const W = w.faceWidthMm;
   const rIn = p.innerDiameterMm / 2;
-  const yTop = rIn + w.headHeightMm;
+  const yTop = rIn + Math.max(w.headHeightMm, (p.constraints?.minHeadRadialMm ?? 1.0) + HEAD_EDGE_RADIUS_MM);
   const shoulder = SHOULDERS[p.shoulder];
   const cornerAngle = Math.atan2(L / 2, yTop);
   const bandAngle = cornerAngle + shoulder.span; // where shoulder meets band (varies with finger size)
@@ -158,13 +185,15 @@ export function createRingMesh(p: RingParameters): RingMesh {
 
   // --- 2. Band cross-section ----------------------------------------------
   const bandHalf = w.bandWidthMm / 2;
+  const minimumBand = p.constraints?.minBandRadialMm ?? 0.7;
+  if (w.bandThicknessMm < minimumBand + INNER_EDGE_RADIUS_MM + BAND_EDGE_RADIUS_MM + COMFORT_MM) {
+    throw new Error("Band thickness cannot support the rounded cross-section clearance");
+  }
   const bandOuterRadius = (z: number) => {
-    const u = Math.min(1, (z / bandHalf) ** 2);
-    const dome =
-      p.profile === "flat" ? 1
-      : p.profile === "classic" ? 0.72 + 0.28 * (1 - u)
-      : 0.45 + 0.55 * Math.pow(1 - u, 0.6); // D-shape: half-round outside
-    return rIn + w.bandThicknessMm * dome;
+    const u = Math.min(1, Math.abs(z / bandHalf));
+    const desiredDrop = p.profile === "flat" ? 0 : p.profile === "classic" ? 0.15 : 0.35;
+    const drop = Math.min(desiredDrop, w.bandThicknessMm - BAND_EDGE_RADIUS_MM - INNER_EDGE_RADIUS_MM - (p.profile === "classic" ? COMFORT_MM : 0) - minimumBand);
+    return rIn + w.bandThicknessMm - drop * u * u;
   };
   /** Quarter-round edge: how far the surface pulls in at z, for half-width h and radius rr. */
   const edgePull = (z: number, h: number, rr: number) => {
@@ -185,14 +214,14 @@ export function createRingMesh(p: RingParameters): RingMesh {
   // --- 4. Shoulders --------------------------------------------------------
   /** Side-profile point (x, y) of the shoulder at parameter t for cross-section column z. */
   const shoulderXY = (side: 1 | -1, t: number, z: number, h: number): [number, number] => {
-    // Start: the head's end wall, heading straight down.
+    // Start: outward, tangent to the level terrain base.
     const ex = (side * L) / 2, ey = yTop;
     // End: the band surface at bandAngle, heading along the band's tangent.
     const rB = bandOuterRadius(Math.max(-bandHalf, Math.min(bandHalf, (z / h) * bandHalf)));
     const bx = side * rB * Math.sin(bandAngle), by = rB * Math.cos(bandAngle);
     const chord = Math.hypot(bx - ex, by - ey);
     const m0 = shoulder.startTangent * chord, m1 = shoulder.endTangent * chord;
-    const t0: [number, number] = [0, -1];
+    const t0: [number, number] = [side, 0];
     const t1: [number, number] = [side * Math.cos(bandAngle), -Math.sin(bandAngle)];
     const t2 = t * t, t3 = t2 * t;
     const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
@@ -246,6 +275,18 @@ export function createRingMesh(p: RingParameters): RingMesh {
     return BAND_EDGE_RADIUS_MM;
   };
 
+  let terrainAdapted = false;
+  const collarLength = Math.max(1.4, Math.min(2.5, W * 0.3));
+  const shoulderTerrain = (row: Row, z: number, h: number) => {
+    if (row.kind === "wall") return { lift: terrainLift(row.side * L / 2, z), blend: 1 };
+    if (row.kind !== "shoulder") return { lift: 0, blend: 0 };
+    const [x, y] = shoulderXY(row.side, row.t, z, h);
+    const distance = Math.hypot(x - row.side * L / 2, y - yTop);
+    const result = terrainCollar(p.terrain, L, W, row.side, z / h * endHalf, distance, collarLength);
+    terrainAdapted ||= result.slopeLimited;
+    return result;
+  };
+
   /** Outer surface point. withTerrain=false gives the bare head (side-wall subdivision). */
   const outerPoint = (row: Row, z: number, withTerrain: boolean): Vec3 => {
     const h = halfWidth(row);
@@ -278,11 +319,15 @@ export function createRingMesh(p: RingParameters): RingMesh {
         return point;
       }
       case "wall": {
-        return rounded((row.side * L) / 2, yTop);
+        const point = rounded((row.side * L) / 2, yTop);
+        if (withTerrain) point[1] += shoulderTerrain(row, z, h).lift;
+        return point;
       }
       case "shoulder": {
         const [x, y] = shoulderXY(row.side, row.t, z, h);
-        return rounded(x, y);
+        const point = rounded(x, y);
+        if (withTerrain) point[1] += shoulderTerrain(row, z, h).lift;
+        return point;
       }
       case "band": {
         const r = bandOuterRadius(z) - pull;
@@ -325,6 +370,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const faceIndices: number[] = [];
   let sink = indices; // where triangle() writes: body or terrain face
   const shades: number[] = [];
+  const terrainBlends: number[] = [];
   const same = (a: number, b: number) => {
     const P = positions;
     return Math.abs(P[a * 3]! - P[b * 3]!) < 1e-7 && Math.abs(P[a * 3 + 1]! - P[b * 3 + 1]!) < 1e-7 &&
@@ -336,12 +382,13 @@ export function createRingMesh(p: RingParameters): RingMesh {
   };
 
   /** Grid over all rows (wrapping). flip=false gives outward normals for an outer surface. */
-  const surface = (columns: number, point: (row: Row, k: number) => Vec3, flip: boolean, isFace?: (row: Row) => boolean) => {
+  const surface = (columns: number, point: (row: Row, k: number) => Vec3, flip: boolean, isFace?: (row: Row) => boolean, finishWeight?: (row: Row, k: number) => number) => {
     const base = positions.length / 3;
     for (const row of rows) {
       for (let k = 0; k < columns; k++) {
         positions.push(...point(row, k));
         shades.push(1);
+        terrainBlends.push(finishWeight?.(row, k) ?? 0);
       }
     }
     for (let i = 0; i < n; i++) {
@@ -380,7 +427,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
   };
 
   const outerColumns = widthSegments + 1;
-  surface(outerColumns, (row, k) => outerPoint(row, zAt(row, k, outerColumns), true), false, (row) => row.kind === "face");
+  surface(outerColumns, (row, k) => outerPoint(row, zAt(row, k, outerColumns), true), false, (row) => row.kind === "face", (row, k) => row.kind === "face" ? 1 : shoulderTerrain(row, zAt(row, k, outerColumns), halfWidth(row)).blend);
   const innerColumns = 13;
   surface(innerColumns, (row, k) => innerPoint(row, zInner(row, k, innerColumns)), true);
   // Side walls: inner edge → (interior points following the head/shoulder plan
@@ -398,13 +445,15 @@ export function createRingMesh(p: RingParameters): RingMesh {
       const x = inner[0] + (bare[0] - inner[0]) * f;
       const y = inner[1] + (bare[1] - inner[1]) * f;
       return [x, y, side * widthAt(x, y, row)];
-    }, side === 1);
+    }, side === 1, undefined, (row, k) => k === wallColumns - 1 ? (row.kind === "face" ? 1 : shoulderTerrain(row, side * halfWidth(row), halfWidth(row)).blend) : 0);
   }
 
   return {
     positions: new Float32Array(positions),
     indices: new Uint32Array([...faceIndices, ...indices]),
     shade: new Float32Array(shades),
+    terrainBlend: new Float32Array(terrainBlends),
+    terrainAdapted,
     faceTriangleCount: faceIndices.length / 3,
     triangleCount: (faceIndices.length + indices.length) / 3
   };

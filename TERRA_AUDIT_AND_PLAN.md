@@ -1,3 +1,5 @@
+> Current implementation: see [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md). Its Terra dimensions, collar behaviour and validation status supersede conflicting historical guidance below.
+
 # Terra ring — geometry, rendering and UX audit
 
 12 November 2026. Baseline: d22c618 on fix/head-corner-tangent. This document records the user's latest direction and the next implementation plan. It supersedes earlier guidance to keep all terrain strictly on the top face. Application code was not changed during this audit.

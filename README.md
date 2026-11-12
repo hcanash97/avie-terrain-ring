@@ -1,4 +1,4 @@
-# À Vie Terrain Ring: configurator prototype
+# À Vie Terra Ring: configurator prototype
 
 A browser configurator for À Vie Diamonds that turns real elevation data into a made-to-order landscape signet ring. The customer chooses a place on a map; its terrain becomes the ring's face. They then choose head shape, face size, metal, finish, shoulders, band profile and size. The 3D preview is generated live.
 
@@ -10,7 +10,7 @@ A browser configurator for À Vie Diamonds that turns real elevation data into a
 cd terrain-ring
 npm install
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
-npm test           # 191 geometry, terrain and material tests
+npm test           # 389 geometry, terrain, map and material tests
 npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
 node scripts/make-artifact.mjs   # single-page bundle in terrain-ring/artifact for Claude artifacts
 node scripts/bake-terrain.mjs    # re-bake saved terrain for the preset places
@@ -50,6 +50,8 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 - **Copy:** calm and quote-based ("nothing is made until you approve it"). Don't add delivery, lead-time or certification promises until À Vie confirms them.
 
 ## Current state (12 Nov 2026) and next steps, in priority order
+
+**Implemented Terra refinement:** read [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md) for current dimensions, validation, rendering recovery and remaining manufacturing work. The older round notes below are historical and are superseded by that report.
 
 **Latest direction:** see [Terra audit and implementation plan](TERRA_AUDIT_AND_PLAN.md). The user now requests reduced substrate metal, width-led shoulder scaling, landscape-dependent shoulder veins, rendering-state recovery and the Terra name. This plan supersedes the older ordering and face-only terrain guidance below.
 Latest external review: joins first, then proportions, then presentation. Keep the feature set fixed until the joins look clean.

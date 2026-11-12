@@ -23,7 +23,7 @@ function measure(weight: Weight, d: number, source: TerrainSource | null, height
     maxY = Math.max(maxY, y);
     minY = Math.min(minY, y);
     // Footprint at the wall line: head points from just below the 0.15 mm edge round upward.
-    if (y >= yTop - 0.2 && Math.abs(x) <= preset.faceLengthMm / 2 + 1e-4) { faceX = Math.max(faceX, Math.abs(x)); faceZ = Math.max(faceZ, Math.abs(z)); }
+    if (i / 3 < (RES.faceSegments + 1) * (RES.widthSegments + 1)) { faceX = Math.max(faceX, Math.abs(x)); faceZ = Math.max(faceZ, Math.abs(z)); }
     if (y < -d / 2 && Math.abs(x) < 0.3) bandZ = Math.max(bandZ, Math.abs(z));
   }
   return {

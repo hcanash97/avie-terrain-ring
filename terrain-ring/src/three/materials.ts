@@ -25,17 +25,40 @@ export function materialParameters(metal: Metal, finish: Finish) {
 }
 
 export function createRingMaterial(metal: Metal, finish: Finish) {
-  return new THREE.MeshStandardMaterial(materialParameters(metal, finish));
+  return blendFinish(new THREE.MeshStandardMaterial(materialParameters(metal, finish)), finish);
+}
+
+function blendFinish(material: THREE.MeshStandardMaterial, finish: Finish) {
+  const body = { value: FINISH_ROUGHNESS[finish] };
+  const terrain = { value: TERRAIN_FACE_ROUGHNESS[finish] };
+  material.userData.terraFinish = { body, terrain };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.terraBodyRoughness = body;
+    shader.uniforms.terraTerrainRoughness = terrain;
+    shader.vertexShader = "attribute float terrainBlend; varying float vTerrainBlend;\n" + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvTerrainBlend = terrainBlend;");
+    shader.fragmentShader = "uniform float terraBodyRoughness; uniform float terraTerrainRoughness; varying float vTerrainBlend;\n" + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(terraBodyRoughness, terraTerrainRoughness, clamp(vTerrainBlend, 0.0, 1.0));");
+  };
+  material.customProgramCacheKey = () => "terra-continuous-finish-v1";
+  return material;
 }
 
 /** Material for the terrain face zone: same metal, textured finish. */
 export function createTerrainMaterial(metal: Metal, finish: Finish) {
-  return new THREE.MeshStandardMaterial({ ...materialParameters(metal, finish), roughness: TERRAIN_FACE_ROUGHNESS[finish] });
+  return blendFinish(new THREE.MeshStandardMaterial({ ...materialParameters(metal, finish), roughness: TERRAIN_FACE_ROUGHNESS[finish] }), finish);
 }
 
 /** Update in place: switching metal never rebuilds geometry or shaders. */
 export function applyRingMaterial(m: THREE.MeshStandardMaterial, metal: Metal, finish: Finish, zone: "body" | "terrain" = "body") {
   const p = materialParameters(metal, finish);
   m.color.setHex(p.color);
+  m.metalness = p.metalness;
+  m.envMapIntensity = p.envMapIntensity;
   m.roughness = zone === "terrain" ? TERRAIN_FACE_ROUGHNESS[finish] : p.roughness;
+  const blend = m.userData.terraFinish;
+  if (blend) {
+    blend.body.value = FINISH_ROUGHNESS[finish];
+    blend.terrain.value = TERRAIN_FACE_ROUGHNESS[finish];
+  }
 }
