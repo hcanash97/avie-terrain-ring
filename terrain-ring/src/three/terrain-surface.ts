@@ -17,7 +17,7 @@
  * DETAIL is defined in millimetres on the finished ring, because what survives
  * casting and hand polishing depends on physical feature size, not data pixels.
  */
-import { blur, minMax, normalise, sampleFrame, type FrameArea, type TerrainSource } from "../geometry/heightmap";
+import { edgeAwareBlur, blur, minMax, normalise, sampleFrame, type FrameArea, type TerrainSource } from "../geometry/heightmap";
 import type { TerrainInput, WeightPreset } from "../geometry/ring-blank";
 
 export type Detail = "low" | "medium" | "high";
@@ -68,7 +68,9 @@ export function buildTerrain(
   const rangeM = max - min;
 
   const { smoothMm, sharpen } = DETAIL[settings.detail];
-  let shaped = blur(raw, cols, rows, smoothMm / mmPerCell);
+  let shaped = settings.detail === "high"
+    ? edgeAwareBlur(raw, cols, rows, smoothMm / mmPerCell)
+    : blur(raw, cols, rows, smoothMm / mmPerCell);
   if (sharpen > 0) {
     const base = blur(raw, cols, rows, SHARPEN_RADIUS_MM / mmPerCell);
     shaped = shaped.map((v, i) => v + (v - base[i]!) * sharpen);

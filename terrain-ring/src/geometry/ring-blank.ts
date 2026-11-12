@@ -47,9 +47,9 @@ export const WEIGHTS: Record<Weight, WeightPreset> = {
 
 /** Cushion (rounded-square) heads: same band and head height per size, broader face, larger corners. */
 const CUSHION: Record<Weight, Pick<WeightPreset, "faceLengthMm" | "faceWidthMm" | "cornerRadiusMm">> = {
-  slim: { faceLengthMm: 10.5, faceWidthMm: 9.5, cornerRadiusMm: 2.5 },
-  standard: { faceLengthMm: 12, faceWidthMm: 11, cornerRadiusMm: 3 },
-  bold: { faceLengthMm: 14, faceWidthMm: 13, cornerRadiusMm: 3.5 }
+  slim: { faceLengthMm: 10.5, faceWidthMm: 9.5, cornerRadiusMm: 1.3 },
+  standard: { faceLengthMm: 12, faceWidthMm: 11, cornerRadiusMm: 1.5 },
+  bold: { faceLengthMm: 14, faceWidthMm: 13, cornerRadiusMm: 1.8 }
 };
 
 export const HEAD_SHAPES: Record<HeadShape, string> = { bar: "Bar", cushion: "Cushion" };
@@ -127,8 +127,8 @@ const smootherstep = (x: number) => {
 const SHOULDERS: Record<ShoulderStyle, { span: number; startTangent: number; endTangent: number; width: (t: number) => number }> = {
   // Shorter start tangents turn the shoulder outward sooner, so less vertical wall shows under the head.
   straight: { span: 0.58, startTangent: 0.5, endTangent: 0.8, width: easedLinear },
-  classic: { span: 0.62, startTangent: 0.6, endTangent: 1.0, width: (t) => smootherstep(t) ** 1.6 }, // broad, then eases in
-  curved: { span: 0.72, startTangent: 0.75, endTangent: 0.7, width: (t) => smootherstep(t) ** 0.8 }
+  classic: { span: 0.62, startTangent: 0.6, endTangent: 1.0, width: (t) => smootherstep(t) ** 2.0 }, // broad, then eases in
+  curved: { span: 0.72, startTangent: 0.75, endTangent: 0.7, width: (t) => smootherstep(t) ** 1.1 }
 };
 
 /** Straight in the middle, zero width derivative at both ends. */
@@ -244,7 +244,15 @@ export function createRingMesh(p: RingParameters): RingMesh {
   const shoulderHalf = (row: Row) => {
     if (row.kind === "shoulder") return endHalf + (bandHalf - endHalf) * shoulder.width(row.t);
     if (row.kind === "band") return bandHalf;
-    return endHalf; // face and wall rows: where the shoulder begins
+    // Carry more of a broad face into its supporting side wall. Previously
+    // every face row inherited the narrow flat-end width of the rounded head,
+    // making cushion corners look suspended above a pinched neck.
+    if (row.kind === "face") {
+      const target = Math.max(endHalf, footprint(row.x));
+      const support = W / L > 0.75 ? 0.5 : 0.3;
+      return endHalf + (target - endHalf) * support;
+    }
+    return endHalf; // exact end width is retained for the shoulder connection
   };
   /**
    * Half-width of the solid at (x, y) within this cross-section: the shoulder width plus
@@ -326,7 +334,23 @@ export function createRingMesh(p: RingParameters): RingMesh {
       case "shoulder": {
         const [x, y] = shoulderXY(row.side, row.t, z, h);
         const point = rounded(x, y);
-        if (withTerrain) point[1] += shoulderTerrain(row, z, h).lift;
+        if (withTerrain) {
+          const collar = shoulderTerrain(row, z, h);
+          // Rotate the lift gradually toward the local outward normal. The
+          // rotation has zero derivative at the head boundary, preserving the
+          // existing terrain departure rather than introducing a new crease.
+          const e = 0.0001;
+          const a = shoulderXY(row.side, Math.max(0, row.t - e), z, h);
+          const b = shoulderXY(row.side, Math.min(1, row.t + e), z, h);
+          const dx = b[0] - a[0], dy = b[1] - a[1];
+          const n = Math.hypot(dx, dy);
+          const turn = (1 - collar.blend) * 0.65;
+          const nx = n > 0 ? -row.side * dy / n * turn : 0;
+          const ny = n > 0 ? 1 + (row.side * dx / n - 1) * turn : 1;
+          const norm = Math.hypot(nx, ny);
+          point[0] += collar.lift * nx / norm;
+          point[1] += collar.lift * ny / norm;
+        }
         return point;
       }
       case "band": {

@@ -231,3 +231,6 @@ details.refine > div { margin-top: 14px; }
   .stepper-note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .step-body > .stack { animation: none; } .stepper li button { transition: none; } }
+
+/* Reserve actual wrapped camera controls and caption space at every viewport. */
+.stage-foot { bottom: var(--toolbar-space, 116px); }

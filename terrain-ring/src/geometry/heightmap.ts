@@ -131,3 +131,30 @@ export function createDemoSource(): TerrainSource {
     }
   };
 }
+
+/** Range-weighted smoothing for high detail. Each output is a convex average:
+ * no sharpening, overshoot, or invented peaks. Two separable passes bound cost.
+ * This preserves strong elevation transitions; it cannot recover source detail.
+ */
+export function edgeAwareBlur(data: Float32Array, cols: number, rows: number, sigma: number): Float32Array {
+  if (sigma < 0.3) return data;
+  const [lo, hi] = minMax(data), rangeSigma = (hi - lo) * 0.03;
+  if (!(rangeSigma > 0)) return data.slice();
+  const radius = Math.ceil(sigma * 2.5), spatial = Array.from({length:radius*2+1},(_,i)=>Math.exp(-((i-radius)**2)/(2*sigma*sigma)));
+  const pass = (input:Float32Array, horizontal:boolean) => {
+    const out = new Float32Array(data.length);
+    for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+      const centre=input[y*cols+x]!;let total=0,sum=0;
+      for(let k=-radius;k<=radius;k++){
+        const xx=horizontal?Math.max(0,Math.min(cols-1,x+k)):x;
+        const yy=horizontal?y:Math.max(0,Math.min(rows-1,y+k));
+        const v=input[yy*cols+xx]!,difference=(v-centre)/rangeSigma;
+        const weight=spatial[k+radius]!*Math.exp(-difference*difference/2);
+        sum+=v*weight;total+=weight;
+      }
+      out[y*cols+x]=sum/total;
+    }
+    return out;
+  };
+  return pass(pass(data,true),false);
+}

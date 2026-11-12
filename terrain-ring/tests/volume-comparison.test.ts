@@ -16,9 +16,11 @@ it("records comparable old/new preview volumes", () => {
   const old=baseline.find(r=>r.shape===shape && r.weight===weight && r.fixture===fixture)!.volumeMm3,now=measure(after);
   rows.push({shape,weight,fixture,beforeMm3:old,afterMm3:now,reductionPercent:(old-now)/old*100,before9ctG:old*.0112,after9ctG:now*.0112});
   expect(now).toBeGreaterThan(0);
-  expect(now).toBeLessThan(old);
+  // Squarer cushion corners deliberately add support area. Bound the
+  // increase rather than claiming every revised silhouette weighs less.
+  expect(now).toBeLessThan(old * 1.08);
  }
- const lines = ["# Terra volume comparison", "", "Before: f657b84. After: current generator. Classic shoulders, comfort profile, 17.2 mm opening, 70% relief, 5 km selection. Same face footprints and sources. Flat/ramp/mountain are deterministic synthetic fixtures, not physical samples. 9ct mass uses the existing 11.2 g/cm³ estimate.", "", "| Head | Size | Terrain | Before mm³ | After mm³ | Reduction | Before 9ct g | After 9ct g |", "|---|---|---|---:|---:|---:|---:|---:|"];
+ const lines = ["# Terra volume comparison", "", "Before: f657b84. After: current generator. Classic shoulders, comfort profile, 17.2 mm opening, 70% relief, 5 km selection. Same overall face lengths/widths and sources; current Cushion corners are squarer, so footprint area differs. Negative reduction means added support metal. Flat/ramp/mountain are deterministic synthetic fixtures, not physical samples. 9ct mass uses the existing 11.2 g/cm³ estimate.", "", "| Head | Size | Terrain | Before mm³ | After mm³ | Reduction | Before 9ct g | After 9ct g |", "|---|---|---|---:|---:|---:|---:|---:|"];
  for (const r of rows) lines.push(`| ${r.shape} | ${r.weight} | ${r.fixture} | ${r.beforeMm3.toFixed(1)} | ${r.afterMm3.toFixed(1)} | ${r.reductionPercent.toFixed(1)}% | ${r.before9ctG.toFixed(2)} | ${r.after9ctG.toFixed(2)} |`);
  lines.push("", "Thickness checks are separate. Volume reduction does not establish castability or the final selling price.", "");
  writeFileSync("../TERRA_VOLUME_COMPARISON.md",lines.join("\n"));

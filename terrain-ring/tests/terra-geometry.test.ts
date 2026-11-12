@@ -27,7 +27,7 @@ describe("supported rounded bands", () => {
  }
 });
 
-describe("geometry matrix: opening, closure and finite normals",()=>{
+describe("geometry matrix: opening, closure and finite coordinates",()=>{
  for(const shape of ["bar","cushion"] as const) for(const size of ["slim","standard","bold"] as const) for(const d of [15,17.2,21.5]) for(const shoulder of ["straight","classic","curved"] as ShoulderStyle[]) for(const profile of ["flat","classic","d_shape"] as BandProfile[]) {
   it(`${shape}/${size}/${d}/${shoulder}/${profile}`,()=>{
    const w=facePreset(size,shape),terrain={data:new Float32Array([0,1,1,0]),cols:2,rows:2,reliefMm:w.maxReliefMm};

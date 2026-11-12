@@ -8,14 +8,15 @@ import { createRenderer } from "./renderer";
 import { createFpsProbe } from "./performance";
 import { weldedNormals, type RingMesh } from "../geometry/ring-blank";
 
-export type ViewName = "three_quarter" | "front" | "side" | "top";
+export type ViewName = "three_quarter" | "front" | "side" | "top" | "detail";
 
 /** Fixed camera presets (position; all look at the ring centre). Shared by the UI and comparison captures. */
 export const VIEWS: Record<ViewName, [number, number, number]> = {
   three_quarter: [-30, 34, 46],
   front: [0, 10, 52],
   side: [52, 6, 0],
-  top: [0, 54, 6]
+  top: [0, 54, 6],
+  detail: [-22, 42, 35]
 };
 const TARGET = new THREE.Vector3(0, 2.5, 0);
 
@@ -64,18 +65,23 @@ export function createScene(
   const material = createRingMaterial("gold_18ct", "polished");
   const terrainMaterial = createTerrainMaterial("gold_18ct", "polished");
   const metalZones = [material, terrainMaterial];
-  const clay = new THREE.MeshStandardMaterial({ color: 0xcdc6bc, roughness: 0.62, metalness: 0, envMapIntensity: 0.9 });
+  const clay = new THREE.MeshStandardMaterial({ color: 0x80868d, roughness: 0.75, metalness: 0, envMapIntensity: 0.25 });
   const ring = new THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>(new THREE.BufferGeometry(), metalZones);
   scene.add(ring);
 
   const shadow = createContactShadow();
   scene.add(shadow.mesh);
   let bounds: THREE.Sphere | null = null;
+  let headBox: THREE.Box3 | null = null;
+  let activeView: ViewName = "three_quarter";
   const fit = (direction = camera.position.clone().sub(controls.target)) => {
     if (!bounds) return;
-    controls.target.copy(bounds.center);
-    camera.position.copy(direction.normalize().multiplyScalar(fitBoxDistance(ring.geometry.boundingBox!, direction, camera.aspect, camera.fov)).add(bounds.center));
-    controls.minDistance = bounds.radius * 1.25;
+    const box = activeView === "detail" && headBox ? headBox : ring.geometry.boundingBox!;
+    const centre = box.getCenter(new THREE.Vector3());
+    const radius = box.getBoundingSphere(new THREE.Sphere()).radius;
+    controls.target.copy(centre);
+    camera.position.copy(direction.normalize().multiplyScalar(fitBoxDistance(box, direction, camera.aspect, camera.fov)).add(centre));
+    controls.minDistance = radius * 1.25;
     controls.maxDistance = bounds.radius * 8;
     controls.update();
   };
@@ -167,6 +173,13 @@ export function createScene(
       geometry.setAttribute("normal", new THREE.BufferAttribute(weldedNormals(mesh), 3));
       geometry.computeBoundingBox();
       bounds = geometry.boundingBox!.getBoundingSphere(new THREE.Sphere());
+      headBox = new THREE.Box3();
+      const vertex = new THREE.Vector3();
+      for (let i = 0; i < mesh.faceTriangleCount * 3; i++) {
+        vertex.fromArray(mesh.positions, mesh.indices[i]! * 3);
+        headBox.expandByPoint(vertex);
+      }
+      if (headBox.isEmpty()) headBox.copy(geometry.boundingBox!);
       ring.geometry.dispose(); // never leak the previous build
       ring.geometry = geometry;
       fit();
@@ -181,6 +194,7 @@ export function createScene(
       ring.material = on ? clay : metalZones;
     },
     setView(view) {
+      activeView = view;
       const [x, y, z] = VIEWS[view];
       camera.position.set(x, y, z);
       fit(new THREE.Vector3(x, y, z).sub(TARGET));

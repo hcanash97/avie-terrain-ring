@@ -1,3 +1,5 @@
+> Latest shape revision: [docs/shape-refinement.md](docs/shape-refinement.md). Cushion corner/support changes and revised volume results there supersede the earlier reduction figures below.
+
 # Terra refinement — 12 November 2026
 
 Implemented on `feature/terra-refinement`. This document supersedes older face-only terrain and substrate dimensions in the historical audit/geometry notes.

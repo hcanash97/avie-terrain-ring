@@ -21,6 +21,7 @@ export function RingViewer({ source, onStats }: Props) {
   const [simplified, setSimplified] = useState(false);
   const [sceneVersion, setSceneVersion] = useState(0);
   const [contextLost, setContextLost] = useState(false);
+  const [comparison, setComparison] = useState("");
   const { metal, finish, weight, headShape, shoulder, profile, ringSize, clay } = useRingStore();
   const { place, bearingDeg, terrainHeight, detail, dragging, flat } = useTerrainStore();
   const [view, setView] = useState<ViewName>("three_quarter");
@@ -30,13 +31,18 @@ export function RingViewer({ source, onStats }: Props) {
     if (!stage) return;
     const heading = stage.querySelector<HTMLElement>(".stage-head");
     const foot = stage.querySelector<HTMLElement>(".stage-foot");
+    const toolbar = stage.querySelector<HTMLElement>(".view-bar");
     const measure = () => {
       stage.style.setProperty("--viewer-top", `${(heading?.offsetTop ?? 20) + (heading?.offsetHeight ?? 100) + 12}px`);
-      stage.style.setProperty("--viewer-bottom", `${(foot?.offsetHeight ?? 40) + 86}px`);
+      const toolbarBottom = toolbar ? parseFloat(getComputedStyle(toolbar).bottom) : 18;
+      stage.style.setProperty("--toolbar-space", `${(toolbar?.offsetHeight ?? 40) + toolbarBottom + 16}px`);
+      stage.style.setProperty("--viewer-bottom", `${foot ? stage.clientHeight - foot.offsetTop + 12 : 130}px`);
     };
     const observer = new ResizeObserver(measure);
     if (heading) observer.observe(heading);
     if (foot) observer.observe(foot);
+    if (toolbar) observer.observe(toolbar);
+    observer.observe(stage);
     measure();
     return () => observer.disconnect();
   }, []);
@@ -108,7 +114,7 @@ export function RingViewer({ source, onStats }: Props) {
     return () => clearTimeout(id);
   }, [source, place.lengthM, bearingDeg, terrainHeight, detail, weight, headShape, shoulder, profile, ringSize, metal, dragging, quality, onStats, flat, sceneVersion]);
 
-  const VIEW_LABELS: [ViewName, string][] = [["three_quarter", "¾"], ["front", "Front"], ["side", "Side"], ["top", "Top"]];
+  const VIEW_LABELS: [ViewName, string][] = [["three_quarter", "¾"], ["front", "Front"], ["side", "Side"], ["top", "Top"], ["detail", "Detail"]];
 
   return (
     <>
@@ -134,6 +140,12 @@ export function RingViewer({ source, onStats }: Props) {
         <label><input type="checkbox" checked={clay} onChange={(e) => useRingStore.getState().set({ clay: e.target.checked })} /> Clay</label>
         <label><input type="checkbox" checked={flat} onChange={(e) => useTerrainStore.getState().set({ flat: e.target.checked })} /> Flat terrain</label>
         <button onClick={() => sceneRef.current?.simulateContextRecovery()}>Test GPU recovery</button>
+        <button disabled={comparison === "Building comparison…"} onClick={async () => {
+          setComparison("Building comparison…");
+          try { await (await import("../three/comparison")).buildComparisonSheet(); setComparison("Comparison saved in captures"); }
+          catch { setComparison("Comparison failed; try again"); }
+        }}>Build comparison sheet</button>
+        {comparison && <span role="status">{comparison}</span>}
       </details>}
       {contextLost && <div className="notice" role="status">Restoring the 3D preview… Your design is retained.</div>}
       {simplified && (

@@ -10,7 +10,7 @@ A browser configurator for À Vie Diamonds that turns real elevation data into a
 cd terrain-ring
 npm install
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
-npm test           # 389 geometry, terrain, map and material tests
+npm test           # 396 geometry, terrain, map and material tests
 npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
 node scripts/make-artifact.mjs   # single-page bundle in terrain-ring/artifact for Claude artifacts
 node scripts/bake-terrain.mjs    # re-bake saved terrain for the preset places
@@ -50,6 +50,8 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 - **Copy:** calm and quote-based ("nothing is made until you approve it"). Don't add delivery, lead-time or certification promises until À Vie confirms them.
 
 ## Current state (12 Nov 2026) and next steps, in priority order
+
+**Latest reference-photo pass:** [Shape refinement and remaining gaps](docs/shape-refinement.md). Includes the Detail camera and dev-only controlled comparison sheet.
 
 **Implemented Terra refinement:** read [TERRA_IMPLEMENTATION.md](TERRA_IMPLEMENTATION.md) for current dimensions, validation, rendering recovery and remaining manufacturing work. The older round notes below are historical and are superseded by that report.
 
