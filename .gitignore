@@ -1,0 +1,7 @@
+node_modules/
+terrain-ring/dist/
+terrain-ring/artifact/
+captures/
+*.zip
+.DS_Store
+.claude/

@@ -1,0 +1,58 @@
+{
+  "Snowdon, GB": {
+    "id": "snowdon-gb",
+    "size": 380,
+    "mPerPx": 22.963968159128665,
+    "cx": 189.91569777776022,
+    "cy": 189.76637895038584,
+    "radiusM": 4320
+  },
+  "Ben Nevis, GB": {
+    "id": "ben-nevis-gb",
+    "size": 484,
+    "mPerPx": 20.928783049094335,
+    "cx": 241.9586844444275,
+    "cy": 241.1616316427244,
+    "radiusM": 5040
+  },
+  "Matterhorn, CH": {
+    "id": "matterhorn-ch",
+    "size": 654,
+    "mPerPx": 13.280090199640767,
+    "cx": 326.57863111118786,
+    "cy": 326.2269910548348,
+    "radiusM": 4320
+  },
+  "Table Mountain, ZA": {
+    "id": "table-mountain-za",
+    "size": 366,
+    "mPerPx": 31.69845323994344,
+    "cx": 182.42901333328336,
+    "cy": 182.26231010840274,
+    "radiusM": 5760
+  },
+  "Mount Fuji, JP": {
+    "id": "mount-fuji-jp",
+    "size": 466,
+    "mPerPx": 62.33638020761115,
+    "cx": 232.41969777777558,
+    "cy": 232.81453323888127,
+    "radiusM": 14400
+  },
+  "Grand Canyon, US": {
+    "id": "grand-canyon-us",
+    "size": 376,
+    "mPerPx": 61.76058141958957,
+    "cx": 187.4834133333352,
+    "cy": 187.82420952434768,
+    "radiusM": 11520
+  },
+  "Lake District, GB": {
+    "id": "lake-district-gb",
+    "size": 586,
+    "mPerPx": 44.43064116905127,
+    "cx": 292.8613333333342,
+    "cy": 292.1519888241892,
+    "radiusM": 12960
+  }
+}
