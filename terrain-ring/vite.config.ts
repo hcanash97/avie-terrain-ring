@@ -4,7 +4,12 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   base: "./",
-  build: { assetsInlineLimit: 100000 },
+  build: {
+    assetsInlineLimit: 100000,
+    // The single-file review page (scripts/make-artifact.mjs) inlines one script,
+    // so that build keeps lazily loaded views in the same bundle.
+    rollupOptions: process.env.ARTIFACT ? { output: { inlineDynamicImports: true } } : {}
+  },
   plugins: [
     react(),
     {
