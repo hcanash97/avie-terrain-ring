@@ -13,6 +13,7 @@
     "@avie/geometry": "*",
     "@avie/terrain": "*",
     "pngjs": "7.0.0",
-    "rhino3dm": "8.17.0"
+    "rhino3dm": "8.17.0",
+    "@avie/product-types": "*"
   }
 }

@@ -110,3 +110,16 @@ The brief's 15 questions stand. Send them with the first review-only package fro
      - Body-to-body edge readings are reported but not judged.
      - Each check states its method. Nothing is judged without a minimum, and no minimum has been set: the CLI's `--min-wall`, `--min-feature` and `--min-rim-angle` are a reviewer's trial values, never an approval.
    - **Not done:** any local correction of the terrain. The options are a rolling-ball limit on narrow features and a rim fill. They wait for a feature-size and rim-angle minimum, ideally the manufacturer's (question 2).
+
+## 9. Pendant prototype package (Milestone C, 13 Nov 2026)
+
+`npm run package -- --product pendant --place "Snowdon, GB" --metal gold_9ct [--height 0.7] [--renders <dir>]`
+
+- **Output:** a review-only package for the 18 mm round pendant (`pendant-round-classic`). The body and the placeholder bail are kept as **separate components** throughout:
+  - one 3DM with two mesh objects on their own layers;
+  - one STL per component.
+  
+  They are never merged, because overlapping shells are not a joined solid.
+- **Values:** all dimensions except the catalogue diameter come from the preview-only profile `pendant-preview-dev-1`. The spec lists those values, every unapproved manufacturing requirement, and why release is blocked.
+- **Validation:** body and bail are checked separately. The join and the rim angle are reported `not_run` with reasons; feature size is reported only.
+- **Sample:** `ORDER-SAMPLE-002_PD-7718B23` (Snowdon, 70%, 9ct). Body Ø18 × 2.05 mm; 18 × 22.4 × 4 mm with the bail; structural wall at least 1.0 mm; feature-size 1st percentile 0.165 mm; body 4.1 g plus bail 0.1 g.
