@@ -22,10 +22,10 @@ import { read3dm, REPRESENTATION_NOTE, write3dm } from "./rhino-3dm";
 import { readBinaryStl, writeBinaryStl } from "./stl";
 
 export const PACKAGE_FORMAT_VERSION = "terra-package/v1";
-const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
+export const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
 
 /** Canonical JSON: sorted keys, so equal content always hashes equally. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object")
     return `{${Object.keys(value as object).sort().map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`).join(",")}}`;
