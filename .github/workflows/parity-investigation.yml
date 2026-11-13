@@ -41,6 +41,7 @@ jobs:
           node --version >> ../evidence/runner.txt
           npm --version >> ../evidence/runner.txt
           npm ls --all --json > ../evidence/dependencies.json
+          node ../diagnostics/.github/diagnostics/scalar-probe.mjs > ../evidence/scalar-probe.json
       - name: Existing strict parity test (failure remains a failure)
         working-directory: subject
         run: node node_modules/vitest/vitest.mjs run packages/geometry/tests/parity.test.ts
