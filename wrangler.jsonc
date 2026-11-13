@@ -11,6 +11,10 @@
       "enabled": true
     }
   },
+  // Required by `wrangler preview` (the Workers Builds preview command for
+  // non-production branches and pull requests). Empty: previews inherit the
+  // assets and compatibility settings above.
+  "previews": {},
   "assets": {
     // The app addresses views with hashes (#blank, #pendant-preview) and Vite
     // emits relative asset URLs (base "./"). A single-page-app fallback would
