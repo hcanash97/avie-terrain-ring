@@ -4,7 +4,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   base: "./",
-  build: { assetsInlineLimit: 100000 },
+  build: {
+    // The single-file review page cannot fetch extra files, so it also inlines
+    // the pendant boolean engine's WASM; normal builds serve it as a file.
+    assetsInlineLimit: process.env.ARTIFACT ? (file: string, content: Buffer) => file.endsWith(".wasm") || content.length < 100000 : 100000,
+    // The single-file review page (scripts/make-artifact.mjs) inlines one script,
+    // so that build keeps lazily loaded views in the same bundle.
+    rollupOptions: process.env.ARTIFACT ? { output: { inlineDynamicImports: true } } : {}
+  },
   plugins: [
     react(),
     {

@@ -234,3 +234,15 @@ details.refine > div { margin-top: 14px; }
 
 /* Reserve actual wrapped camera controls and caption space at every viewport. */
 .stage-foot { bottom: var(--toolbar-space, 116px); }
+
+/* Internal pendant prototype preview (#pendant-preview). */
+.pendant-preview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); height: 100%; }
+.pendant-stage { height: 100%; }
+.pendant-stage .viewer { position: absolute; inset: 0; }
+.pendant-panel { overflow: auto; padding: 20px 22px; display: grid; gap: 12px; align-content: start; background: var(--bg); }
+.pendant-panel label { display: grid; gap: 4px; }
+.pendant-panel h2 { font-size: 1.05rem; margin-top: 6px; }
+.pendant-panel table { border-collapse: collapse; font-size: 0.85rem; }
+.pendant-panel td { padding: 3px 6px 3px 0; vertical-align: top; }
+.pendant-warning { padding: 10px 12px; border: 1px solid var(--ink); }
+@media (max-width: 760px) { .pendant-preview { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; } }
