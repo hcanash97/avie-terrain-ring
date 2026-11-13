@@ -1,0 +1,60 @@
+name: Ring parity investigation (no fixes)
+on:
+  push:
+    branches: [investigate/linux-ring-parity]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: base
+            sha: c4026feb15a0c640399463acba3b9b6953ff72f6
+          - name: head
+            sha: 77f7f877bb1ab8207de2f38e82a52dc0a7830ad9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: diagnostics
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.sha }}
+          path: subject
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+      - name: Frozen installs matching Check workflow
+        working-directory: subject
+        run: |
+          npm ci
+          npm --prefix terrain-ring ci
+      - name: Record runner and dependencies
+        working-directory: subject
+        run: |
+          mkdir -p ../evidence
+          uname -a > ../evidence/runner.txt
+          cat /etc/os-release >> ../evidence/runner.txt
+          node --version >> ../evidence/runner.txt
+          npm --version >> ../evidence/runner.txt
+          npm ls --all --json > ../evidence/dependencies.json
+      - name: Existing strict parity test (failure remains a failure)
+        working-directory: subject
+        run: node node_modules/vitest/vitest.mjs run packages/geometry/tests/parity.test.ts
+      - name: Capture mesh buffers and repeatability after the strict test
+        if: always()
+        working-directory: subject
+        env:
+          PARITY_DIAGNOSTICS_OUT: ${{ github.workspace }}/evidence
+        run: |
+          cp ../diagnostics/.github/diagnostics/platform-parity.test.ts packages/geometry/tests/platform-diagnostic.test.ts
+          node node_modules/vitest/vitest.mjs run packages/geometry/tests/platform-diagnostic.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-${{ matrix.name }}
+          path: evidence
+          retention-days: 7
