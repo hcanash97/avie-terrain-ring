@@ -11,6 +11,7 @@
     }
   },
   "dependencies": {
+    "@avie/geometry": "*",
     "@avie/shared-types": "*",
     "zod": "^4.6.7"
   }

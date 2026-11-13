@@ -73,8 +73,9 @@ export const mountSchema = z.strictObject({
   faceShape: faceShapeSchema,
   widthMm: dimension,
   heightMm: dimension,
-  substrateMm: dimension,
-  reliefLimitMm: finiteSchema.min(0).max(10),
+  /** Null where the manufacturer has not supplied a value. */
+  substrateMm: dimension.nullable(),
+  reliefLimitMm: finiteSchema.min(0).max(10).nullable(),
   crop: cropSchema,
   units: z.literal("mm"),
   axes: z.literal("X-right_Y-relief_Z-face"),

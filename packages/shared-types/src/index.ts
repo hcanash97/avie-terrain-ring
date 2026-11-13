@@ -4,3 +4,4 @@ export * from "./terrain";
 export * from "./configuration";
 export * from "./validation";
 export * from "./artefact";
+export * from "./spec";

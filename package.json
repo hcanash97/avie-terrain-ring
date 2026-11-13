@@ -13,7 +13,8 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
     "format:check": "prettier --check \"packages/**/*.ts\" package.json tsconfig.json vitest.config.ts eslint.config.mjs",
-    "package": "tsx packages/production/src/cli.ts"
+    "package": "tsx packages/production/src/cli.ts",
+    "catalogue:report": "tsx packages/product-types/scripts/write-catalogue-report.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
