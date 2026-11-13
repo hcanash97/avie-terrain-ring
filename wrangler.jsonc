@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Assets-only Worker. With the account workers.dev subdomain `aviediamonds`,
+  // production is https://avie-terra-ring.aviediamonds.workers.dev
+  "name": "avie-terra-ring",
+  "compatibility_date": "2026-11-13",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "assets": {
+    // The app addresses views with hashes (#blank, #pendant-preview) and Vite
+    // emits relative asset URLs (base "./"). A single-page-app fallback would
+    // serve index.html for an unknown path and those relative URLs would miss
+    // the script, the boolean-engine WASM and the saved terrain, so unknown
+    // paths stay a 404.
+    "directory": "./terrain-ring/dist"
+  }
+}

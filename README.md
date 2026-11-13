@@ -2,21 +2,20 @@
 
 A browser configurator for À Vie Diamonds that turns real elevation data into a made-to-order landscape signet ring. The customer chooses a place on a map; its terrain becomes the ring's face. They then choose head shape, face size, metal, finish, shoulders, band profile and size. The 3D preview is generated live.
 
-**Current private online preview (phone/desktop):** https://avie-terra-ring-preview.aware-swift-8528.chatgpt.site
-
-Sign in with the ChatGPT account that owns this Site. Hosting is independent of the laptop. See [hosting notes](docs/hosting.md) for updates.
+**Public prototype:** Cloudflare Workers Builds deploys this repository. See [hosting notes](docs/hosting.md). The earlier ChatGPT Sites preview is superseded.
 
 **Historical preview (Claude-hosted; live map blocked there, presets work):** https://claude.ai/artifact/CGRQ13s5c5kgj6JMji3ojB
 
 ## Run it
 
 ```bash
+npm run build:site # repository root: install both trees and write terrain-ring/dist
 npm ci             # shared workspace dependencies, from the repository root
 cd terrain-ring
 npm ci
 npm run dev        # http://localhost:5173 (live map, search and elevation work here)
 npm test           # 396 geometry, terrain, map and material tests
-npm run build      # static site in terrain-ring/dist (host on Netlify, Vercel, etc.)
+npm run build      # static site in terrain-ring/dist
 node scripts/make-artifact.mjs   # single-page bundle in terrain-ring/artifact for Claude artifacts
 node scripts/bake-terrain.mjs    # re-bake saved terrain for the preset places
 ```

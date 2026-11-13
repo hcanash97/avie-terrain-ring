@@ -1,18 +1,29 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { cases, measure } from "./fixtures/cases";
-const baseline = JSON.parse(
-  readFileSync("packages/geometry/tests/fixtures/pre-extraction.json", "utf8"),
-) as {
-  sourceCommit: string;
-  cases: Record<string, ReturnType<typeof measure>>;
-};
-it("preserves the approved geometry buffers across 486 cases", () => {
-  const variants = Array.from(cases());
-  expect(variants).toHaveLength(486);
-  expect(Object.keys(baseline.cases)).toHaveLength(variants.length);
-  // Re-recorded after the intentional full-width shoulder boundary change.
+
+/**
+ * Evidence of the previous representation, terra-ring/full-width-shoulders.
+ * The file was recorded when the inner centre column was still the cancellation
+ * -h + (2*h*6)/12. Those hashes belong to the environment that wrote the file.
+ * They are not the expected output of the current generator, and they are not
+ * asserted on Linux x64 or macOS arm64: the cancellation residual is not stable
+ * across those two, so a live equality check would fail on one of them.
+ * The corrected buffers are checked against centre-plane-zero.json.
+ */
+const FILE = "packages/geometry/tests/fixtures/pre-extraction.json";
+const HISTORICAL_SHA256 =
+  "f606bb0024914cfc02100b83705d83eec3aee6a907ec05e09a7d098a9e309506";
+
+it("retains the full-width-shoulders fixture unchanged as evidence", () => {
+  const bytes = readFileSync(FILE);
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(
+    HISTORICAL_SHA256,
+  );
+  const baseline = JSON.parse(bytes.toString("utf8")) as {
+    sourceCommit: string;
+    cases: Record<string, unknown>;
+  };
   expect(baseline.sourceCommit).toBe("full-width-shoulders");
-  for (const c of variants)
-    expect(measure(c), c.key).toEqual(baseline.cases[c.key]);
-}, 60000);
+  expect(Object.keys(baseline.cases)).toHaveLength(486);
+});
