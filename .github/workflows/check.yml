@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .node-version
+          node-version: 24.22.2
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -49,3 +49,63 @@ jobs:
 
       - name: Build configurator
         run: npm --prefix terrain-ring run build
+
+      - name: Record centre-column coordinate diff
+        run: CENTRE_COORDINATE_DIFF="${{ runner.temp }}/centre-diff.json" npx vitest run packages/geometry/tests/centre-plane.test.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: centre-diff-Linux-X64
+          path: ${{ runner.temp }}/centre-diff.json
+          if-no-files-found: error
+
+  # Same frozen install and the same Node as the Linux job. macos-15 is the
+  # standard Apple-silicon (arm64) image; macos-15-intel is the Intel image.
+  # macos-14 was retired on 2 November 2026. The centre-plane baseline must
+  # match here as well as on Linux x64. This does not claim any other platform.
+  macos-arm64:
+    name: Typecheck, lint, test, build (macOS arm64)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm Apple silicon
+        run: |
+          echo "uname=$(uname -m) sw_vers=$(sw_vers -productVersion)"
+          test "$(uname -m)" = "arm64"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            terrain-ring/package-lock.json
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Install configurator
+        run: npm --prefix terrain-ring ci
+
+      - name: Typecheck, lint and workspace tests
+        run: npm run check
+
+      - name: Configurator tests
+        run: npm --prefix terrain-ring test
+
+      - name: Measurement reports are up to date
+        run: git diff --exit-code -- MEASUREMENTS.md TERRA_VOLUME_COMPARISON.md
+
+      - name: Build configurator
+        run: npm --prefix terrain-ring run build
+
+      - name: Record centre-column coordinate diff
+        run: CENTRE_COORDINATE_DIFF="${{ runner.temp }}/centre-diff.json" npx vitest run packages/geometry/tests/centre-plane.test.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: centre-diff-macOS-ARM64
+          path: ${{ runner.temp }}/centre-diff.json
+          if-no-files-found: error

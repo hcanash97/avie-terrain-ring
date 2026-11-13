@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { RING_GEOMETRY_CENTRE_PLANE } from "@avie/geometry/terrain-ring";
 import { boundingBox, signedVolume, weld } from "../src/mesh";
 import { buildRingPackage } from "../src/package-builder";
 import { read3dm, write3dm } from "../src/rhino-3dm";
@@ -72,6 +73,9 @@ describe("review-only ring package", () => {
       expect(createHash("sha256").update(readFileSync(join(a.root, f.path))).digest("hex"), f.path).toBe(f.sha256);
     }
 
+    const parameters = JSON.parse(readFileSync(join(a.root, "04_source/design-parameters.json"), "utf8"));
+    expect(parameters.geometryVersion).toBe("test");
+    expect(parameters.geometryAlgorithm).toBe(RING_GEOMETRY_CENTRE_PLANE);
     expect(a.reopenOk).toBe(true);
     expect(a.spec.status).toBe("review_only");
     expect(a.spec.claims).toMatchObject({ editableNurbs: false, castingReady: false });
