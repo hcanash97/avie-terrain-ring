@@ -20,8 +20,8 @@ const PRESET_LENGTH_M: Record<string, number> = {
 
 export type PendantConfiguration = {
   presetId?: string; // default: the 18 mm round
-  style?: PendantStyleId; // default: circle with loop (the first prototype)
-  coverage?: TerrainCoverage; // default: the style's
+  style?: PendantStyleId; // default: the Terrain Medallion (round_slider)
+  coverage?: TerrainCoverage; // default: the style's (full relief)
   place: string;
   lengthM?: number; // ground distance across the body width; defaults to the place's preset
   bearingDeg: number;
@@ -33,7 +33,7 @@ export type PendantConfiguration = {
 
 export async function buildProductionPendant(config: PendantConfiguration) {
   const presetId = config.presetId ?? "pendant-round-classic";
-  const styleId = config.style ?? "circle-loop";
+  const styleId = config.style ?? "round_slider";
   const preset = getPreset(presetId);
   const params = pendantStyleParameters(presetId, styleId, config.coverage);
   const lengthM = config.lengthM ?? PRESET_LENGTH_M[config.place] ?? 6000;

@@ -40,7 +40,7 @@ export type ValidationReport = {
   validatorVersion: string;
 };
 
-export const VALIDATOR_VERSION = "mesh-validation/v2";
+export const VALIDATOR_VERSION = "mesh-validation/v3";
 
 const sub = (a: number[], b: number[]) => [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!];
 const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
@@ -203,9 +203,11 @@ export function selfIntersections(m: Mesh, bvh: TriangleBVH, limit = 1000, locat
  *     measure how sharp or narrow a feature is, not how much metal is behind it.
  *   - rim: where terrain meets the product's wall (edge round and wall strip).
  *     Judged by a product-specific rim check, not the feature measure.
+ *   - channel / attachment: walls of a cut chain channel, or a loop or tab joined
+ *     on. Reported apart from terrain; rays ending on them are not body edges.
  *   - body: everything else (band, shoulders, side walls, edge rounds).
  */
-export const SURFACE = { body: 0, terrain: 1, inner: 2, rim: 3 } as const;
+export const SURFACE = { body: 0, terrain: 1, inner: 2, rim: 3, channel: 4, attachment: 5 } as const;
 export type SurfaceLabel = (typeof SURFACE)[keyof typeof SURFACE];
 
 type RaySample = { t: number; from: number; to: number; at: number[]; tri: number };
@@ -298,6 +300,47 @@ export function featureSize(m: Mesh, bvh: TriangleBVH, labels: ArrayLike<number>
   return summarise(readings);
 }
 
+/** Triangles narrower than this (smallest altitude) are reported as near-degenerate slivers. */
+export const NEAR_DEGENERATE_ALTITUDE_MM = 1e-4;
+
+/** Triangle shape: slivers are valid geometry but trouble some slicing and CAM software. */
+export function triangleQuality(m: Mesh) {
+  const I = m.indices;
+  let nearDegenerate = 0, minAltitude = Infinity, maxEdge = 0;
+  for (let t = 0; t < I.length; t += 3) {
+    const a = vertex(m, I[t]!), b = vertex(m, I[t + 1]!), c = vertex(m, I[t + 2]!);
+    const edges = [Math.hypot(...sub(b, a)), Math.hypot(...sub(c, b)), Math.hypot(...sub(a, c))];
+    const longest = Math.max(...edges);
+    const altitude = longest > 0 ? Math.hypot(...cross(sub(b, a), sub(c, a))) / longest : 0;
+    if (altitude < NEAR_DEGENERATE_ALTITUDE_MM) nearDegenerate++;
+    minAltitude = Math.min(minAltitude, altitude);
+    maxEdge = Math.max(maxEdge, longest);
+  }
+  return { nearDegenerate, minAltitudeMm: minAltitude, maxEdgeMm: maxEdge };
+}
+
+/**
+ * Topology at a glance: connected shells, open / non-manifold / mis-oriented
+ * edges, and the genus (holes through the solid) from Euler's formula, valid
+ * when the mesh is a single closed shell.
+ */
+export function topologySummary(m: Mesh) {
+  const topo = edgeTopology(m);
+  const used = new Set<number>();
+  const edges = new Set<string>();
+  const I = m.indices;
+  for (let t = 0; t < I.length; t += 3)
+    for (let e = 0; e < 3; e++) {
+      const a = I[t + e]!, b = I[t + ((e + 1) % 3)]!;
+      used.add(a);
+      edges.add(a < b ? `${a},${b}` : `${b},${a}`);
+    }
+  const shells = shellCount(m);
+  const euler = used.size - edges.size + I.length / 3;
+  const closed = topo.boundary === 0 && topo.nonManifold === 0;
+  return { shells, genus: shells === 1 && closed ? (2 - euler) / 2 : null, boundaryEdges: topo.boundary, nonManifoldEdges: topo.nonManifold, misorientedEdges: topo.misoriented };
+}
+
 export type CommonInputs = {
   productType: string;
   profile: ConstraintProfile;
@@ -342,6 +385,15 @@ export function validateMesh(
   const shells = shellCount(m);
   checks.singleShell = { status: shells === 1 ? "pass" : "fail", method: "edge-connected components", measured: shells, required: 1 };
   if (shells !== 1) fail("MULTIPLE_SHELLS", "Mesh is not a single connected shell.", shells, 1);
+
+  const quality = triangleQuality(m);
+  checks.triangleQuality = {
+    status: quality.nearDegenerate === 0 ? "pass" : "warn",
+    method: `smallest altitude of each triangle; below ${NEAR_DEGENERATE_ALTITUDE_MM} mm counts as a near-degenerate sliver`,
+    measured: { nearDegenerate: quality.nearDegenerate, minAltitudeMm: +quality.minAltitudeMm.toExponential(2), maxEdgeMm: +quality.maxEdgeMm.toFixed(3) },
+    note: "Reported, not judged: slivers are valid geometry, but some slicing and CAM software handles them poorly.",
+  };
+  if (quality.nearDegenerate) warnings.push({ code: "NEAR_DEGENERATE_TRIANGLES", message: "Mesh contains near-degenerate sliver triangles.", measured: quality.nearDegenerate });
 
   const volume = signedVolumeMm3(m);
   checks.outwardNormals = { status: volume > 0 ? "pass" : "fail", method: "signed volume positive", measured: +volume.toFixed(3) };

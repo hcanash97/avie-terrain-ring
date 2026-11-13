@@ -187,6 +187,36 @@ describe("pendant styles", () => {
         }
       }
     }
-    expect(() => pendantStyleParameters("pendant-round-classic", "block")).toThrow(/needs a tablet/);
+    expect(() => pendantStyleParameters("pendant-round-classic", "tablet_slider")).toThrow(/needs a tablet/);
+  });
+});
+
+describe("pendant collection", () => {
+  it("names three primary styles, keeps the loop internal, and never flattens terrain by default", async () => {
+    const { PENDANT_STYLES } = await import("../src/index");
+    const primary = Object.values(PENDANT_STYLES).filter((s) => s.collection === "primary").map((s) => [s.id, s.label]);
+    expect(primary).toEqual([["tablet_slider", "Terrain Tablet Pendant"], ["cushion_tab", "Terrain Cushion Pendant"], ["round_slider", "Terrain Medallion"]]);
+    expect(PENDANT_STYLES.round_loop.collection).toBe("internal");
+    for (const s of Object.values(PENDANT_STYLES)) {
+      expect(s.defaultCoverage.mode, s.id).toBe("full");
+      expect(s.expectedTopology).toMatchObject({ shells: 1, genus: 1 });
+    }
+  });
+
+  it("never shows a size name without its millimetres", async () => {
+    const { sizeLabel } = await import("../src/index");
+    expect(sizeLabel("pendant-tablet-classic")).toBe("Classic · 12 × 20 mm");
+    expect(sizeLabel("pendant-round-petite")).toBe("Petite · Ø14 mm");
+    expect(sizeLabel("pendant-hexagon-statement")).toBe("Statement · 22 mm across flats");
+  });
+
+  it("describes the flattening option as stylised, not as land and water", async () => {
+    const { COVERAGE_LABELS } = await import("../src/index");
+    expect(COVERAGE_LABELS.above_level).toMatch(/stylised; not a coastline/);
+  });
+
+  it("keeps the generated preset table in step with the code (regenerate with npm run catalogue:report)", async () => {
+    const { renderPendantPresets } = await import("../src/catalogue/pendant-report");
+    expect(readFileSync(resolve(import.meta.dirname, "../../../docs/pendant-presets.md"), "utf8")).toBe(renderPendantPresets());
   });
 });

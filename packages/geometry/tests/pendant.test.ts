@@ -4,12 +4,13 @@ import {
   circleOutline,
   createPendant,
   createPendantBody,
+  sectionAtZ,
   outlineDistance,
   SURFACE_LABEL,
   type PendantAttachment,
   type PendantBodyParameters,
 } from "../src/products/terrain-pendant";
-import { validateMesh } from "../src/validation/common";
+import { topologySummary, triangleQuality, validateMesh } from "../src/validation/common";
 
 /** Synthetic terrain: f(u, v) with u west→east, v north→south. */
 function field(f: (u: number, v: number) => number, n = 121, reliefMm = 1.4): TerrainRelief {
@@ -125,4 +126,51 @@ describe("attachments are part of one solid", () => {
     expect(Math.abs(lo.dimensions.body.depthMm - hi.dimensions.body.depthMm)).toBeLessThan(0.03);
     expect(Math.abs(lo.dimensions.volumeMm3 - hi.dimensions.volumeMm3) / hi.dimensions.volumeMm3).toBeLessThan(0.01);
   }, 120000);
+});
+
+describe("surface classification after cutting and joining", () => {
+  const labelsOf = (m: { surfaceLabels?: Uint8Array }) => new Set(m.surfaceLabels);
+  it("labels channel walls as channel, never terrain or back", async () => {
+    const a: PendantAttachment = { kind: "through_hole", diameterMm: 1.8, centreFromTopMm: 2.2, centreHeightMm: 1.8 };
+    const p = await createPendant({ ...body({ outline: OUTLINES.block, baseThicknessMm: 3.6 }), attachment: a });
+    const P = p.mesh.positions, I = p.mesh.indices, L = p.mesh.surfaceLabels!;
+    let onWall = 0;
+    for (let t = 0; t < I.length; t += 3) {
+      const corners = [0, 1, 2].map((k) => [P[I[t + k]! * 3 + 1]!, P[I[t + k]! * 3 + 2]!]);
+      const onChannel = corners.every(([y, z]) => Math.abs(Math.hypot(y! - 1.8, z! - (-10 + 2.2)) - 0.9) < 0.02);
+      if (onChannel) { onWall++; expect(L[t / 3]).toBe(SURFACE_LABEL.channel); }
+    }
+    expect(onWall).toBeGreaterThan(100);
+    expect(labelsOf(p.mesh).has(SURFACE_LABEL.attachment)).toBe(false);
+  }, 60000);
+
+  it("labels a joined tab as attachment, and terrain stays on the face", async () => {
+    const a: PendantAttachment = { kind: "tab", widthMm: 4, thicknessMm: 0.9, openingHeightMm: 3, openingDepthMm: 2.4, embedMm: 1 };
+    const p = await createPendant({ ...body({ outline: OUTLINES.cushion, baseThicknessMm: 1.6, edgeRoundMm: 0.5 }), attachment: a });
+    const P = p.mesh.positions, I = p.mesh.indices, L = p.mesh.surfaceLabels!;
+    for (let t = 0; t < I.length; t += 3) {
+      const zs = [0, 1, 2].map((k) => P[I[t + k]! * 3 + 2]!);
+      if (zs.every((z) => z < -8 - 0.01)) expect(L[t / 3], "above the top edge only the tab exists").toBe(SURFACE_LABEL.attachment);
+      if (L[t / 3] === SURFACE_LABEL.terrain) expect(Math.max(...zs)).toBeLessThanOrEqual(8 + 1e-6);
+    }
+    expect(labelsOf(p.mesh).has(SURFACE_LABEL.channel)).toBe(false);
+  }, 60000);
+});
+
+describe("mesh quality and topology reports", () => {
+  it("reports slivers and the genus of a pendant with a channel", async () => {
+    const p = await createPendant({ ...body({ outline: OUTLINES.block, baseThicknessMm: 3.6 }), attachment: { kind: "through_hole", diameterMm: 1.8, centreFromTopMm: 2.2, centreHeightMm: 1.8 } });
+    expect(topologySummary(p.mesh)).toMatchObject({ shells: 1, genus: 1, boundaryEdges: 0, nonManifoldEdges: 0, misorientedEdges: 0 });
+    const q = triangleQuality(p.mesh);
+    expect(q.minAltitudeMm).toBeGreaterThan(0);
+    expect(Number.isInteger(q.nearDegenerate)).toBe(true);
+  }, 60000);
+
+  it("measures slices exactly on known shapes", async () => {
+    const disc = await createPendant({ ...body({ terrain: null, baseThicknessMm: 1.0, edgeRoundMm: 0.3 }), attachment: { kind: "none" } });
+    expect(sectionAtZ(disc.mesh, 0).areaMm2).toBeCloseTo(18 * 1 - 4 * 0.09 * (1 - Math.PI / 4), 1);
+    const loop = await createPendant({ ...body({ terrain: null, baseThicknessMm: 1.0, edgeRoundMm: 0.3 }), attachment: { kind: "loop", openingHeightMm: 3, openingDepthMm: 2, wallMm: 1, embedMm: 0.6 } });
+    // Two legs of a 24-sided Ø1 section through the opening's centre.
+    expect(sectionAtZ(loop.mesh, -9 - 2 - 0.5 + 0.6).areaMm2).toBeCloseTo(2 * 12 * 0.25 * Math.sin(Math.PI / 12), 2);
+  }, 60000);
 });

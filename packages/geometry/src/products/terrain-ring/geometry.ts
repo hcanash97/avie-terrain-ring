@@ -759,6 +759,10 @@ export {
   openEdgeCount,
 } from "../shared/mesh";
 
+/** Where the densities below come from (shown wherever a mass is estimated). */
+export const METAL_DENSITY_SOURCE =
+  "Typical published alloy densities in g/cm³, not supplied by the manufacturer; confirm against the maker's alloys before quoting weights.";
+
 export const METAL_DENSITY_G_CM3 = {
   silver_925: 10.36,
   gold_9ct: 11.2,

@@ -115,6 +115,8 @@ export async function write3dmComponents(components: Component3dm[], documentMet
 }
 
 export type Reopened3dmObject = {
+  /** The mesh as stored, when requested, so its topology can be re-checked. */
+  mesh?: { positions: Float32Array; indices: Uint32Array };
   name: string;
   layerName: string;
   vertexCount: number;
@@ -124,7 +126,7 @@ export type Reopened3dmObject = {
 };
 
 /** Reopens a multi-component 3DM and reports every object, its layer and the document strings. */
-export async function read3dmComponents(bytes: Uint8Array, objectKeys: string[], documentKeys: string[]) {
+export async function read3dmComponents(bytes: Uint8Array, objectKeys: string[], documentKeys: string[], includeMesh = false) {
   const r = await rhino();
   const doc = r.File3dm.fromByteArray(bytes);
   if (!doc) throw new Error("3DM could not be parsed");
@@ -142,7 +144,19 @@ export async function read3dmComponents(bytes: Uint8Array, objectKeys: string[],
     }
     const userStrings: Record<string, string> = {};
     for (const k of objectKeys) userStrings[k] = attrs.getUserString(k);
-    objects.push({ name: attrs.name, layerName: doc.layers().get(attrs.layerIndex).name, vertexCount: verts.count, triangleCount: geometry.faces().triangleCount, bbox: { min, max }, userStrings });
+    let mesh: Reopened3dmObject["mesh"];
+    if (includeMesh) {
+      const positions = new Float32Array(verts.count * 3);
+      for (let i = 0; i < verts.count; i++) { const v = verts.get(i); positions[i * 3] = v[0]!; positions[i * 3 + 1] = v[1]!; positions[i * 3 + 2] = v[2]!; }
+      const faces = geometry.faces(), tris: number[] = [];
+      for (let f = 0; f < faces.count; f++) {
+        const q = faces.get(f);
+        tris.push(q[0]!, q[1]!, q[2]!);
+        if (q[3] !== q[2]) tris.push(q[0]!, q[2]!, q[3]!); // quad face
+      }
+      mesh = { positions, indices: new Uint32Array(tris) };
+    }
+    objects.push({ mesh, name: attrs.name, layerName: doc.layers().get(attrs.layerIndex).name, vertexCount: verts.count, triangleCount: geometry.faces().triangleCount, bbox: { min, max }, userStrings });
   }
   // The string table is read by index; each entry is a [key, value] pair.
   const table: Record<string, string> = {};

@@ -7,7 +7,7 @@
  *     [--shoulder classic] [--profile classic] [--min-wall <mm>] [--min-feature <mm>] [--min-rim-angle <deg>] [--renders <dir>] \
  *     [--order SAMPLE-001] [--out production-packages]
  *
- *   npm run package -- --product pendant --style circle|circle-loop|block|charm [--size petite|classic|statement] \
+ *   npm run package -- --product pendant --style tablet_slider|cushion_tab|round_slider|round_loop [--size petite|classic|statement] \
  *     --place "Snowdon, GB" --metal gold_9ct [--height 0.7] [--coverage full|above_level] [--level 0.3] \
  *     [--detail high] [--bearing 0] [--finish polished] [--renders <dir>] [--order SAMPLE-002]
  */
@@ -34,7 +34,7 @@ const product = arg("product", "ring");
 if (product === "pendant") {
   const started = Date.now();
   const metal = arg("metal", "gold_9ct") as RingConfiguration["metal"];
-  const style = arg("style", "circle-loop") as PendantStyleId;
+  const style = arg("style", "round_slider") as PendantStyleId;
   if (!(style in PENDANT_STYLES)) throw new Error(`Unknown style "${style}". Styles: ${Object.keys(PENDANT_STYLES).join(", ")}`);
   const coverageMode = arg("coverage");
   const result = await buildPendantPackage({
@@ -60,7 +60,7 @@ if (product === "pendant") {
   const d = result.spec.dimensions;
   console.log(`Package: ${result.root}`);
   console.log(`Status: ${result.spec.status} (validation: ${r.status}; reopen checks ${result.reopenOk ? "passed" : "FAILED"})`);
-  console.log(`Errors: ${r.errors.map((e) => e.code).join(", ") || "none"}; genus ${r.checks.genus.measured}`);
+  console.log(`Errors: ${r.errors.map((e) => e.code).join(", ") || "none"}; holes through the solid ${r.checks.topology.measured} (expected ${r.checks.topology.required}); warnings ${r.warnings.map((w) => w.code).join(", ") || "none"}`);
   console.log(`${result.spec.style.label}: body ${d.body.widthMm} × ${d.body.heightMm} × ${d.body.depthMm} mm; overall ${d.overall.widthMm} × ${d.overall.heightMm} × ${d.overall.depthMm} mm`);
   if (wall) console.log(`Structural wall: min ${wall.minMm} mm, 1st percentile ${wall.p1Mm} mm`);
   if (feature) console.log(`Terrain feature size (sphere): 1st percentile ${feature.p1Mm} mm, median ${feature.medianMm} mm`);
