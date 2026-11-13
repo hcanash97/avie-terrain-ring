@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createDemoSource, type TerrainSource } from "../geometry/heightmap";
 import { loadBakedSource, loadTerrainSource } from "../three/heightmap-loader";
 import { isWebGLAvailable } from "../three/renderer";
@@ -8,12 +8,16 @@ import { useRingStore } from "../state/ringStore";
 import { useTerrainStore } from "../state/terrainStore";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { RingViewer, type PreviewStats } from "./RingViewer";
+import { PreviewBoundary } from "./PreviewBoundary";
+import { Collection } from "./Collection";
+import { ProductImage } from "./ProductImage";
 import { StepLocation } from "./StepLocation";
 import { StepLandscape } from "./StepLandscape";
 import { StepRing } from "./StepRing";
 import { StepReview } from "./StepReview";
 import { LoadingOverlay } from "./LoadingOverlay";
 import { ErrorBanner } from "./ErrorBanner";
+import { withTimeout } from "../lib/withTimeout";
 import { track } from "../lib/analytics";
 import logo from "../assets/avie-logo.png";
 
@@ -22,6 +26,12 @@ const SITE = "https://aviediamonds.com";
 
 export function Configurator() {
   const [step, setStep] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const navigate = (next: number) => {
+    setStep(next);
+    requestAnimationFrame(() => { headingRef.current?.focus({ preventScroll: true }); bodyRef.current?.scrollTo(0, 0); });
+  };
   const [source, setSource] = useState<TerrainSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -38,8 +48,9 @@ export function Configurator() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    loadTerrainSource(area.lat, area.lon, area.lengthM * 0.72, area.lengthM / 600, controller.signal)
+    withTimeout(loadTerrainSource(area.lat, area.lon, area.lengthM * 0.72, area.lengthM / 600, controller.signal), 12000)
       .then((s) => {
+        if (controller.signal.aborted) return;
         setSource(s);
         setNotice(null);
         setTerrain({ terrainOrigin: "live" });
@@ -47,7 +58,7 @@ export function Configurator() {
       })
       .catch(async (err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        const saved = await loadBakedSource(area.name, controller.signal).catch(() => null);
+        const saved = await withTimeout(loadBakedSource(area.name, controller.signal), 8000).catch(() => null);
         if (controller.signal.aborted) return;
         if (saved) {
           setSource(saved);
@@ -56,7 +67,7 @@ export function Configurator() {
           return;
         }
         setTerrain({ terrainOrigin: "sample" });
-        setSource((prev) => prev ?? createDemoSource());
+        setSource(createDemoSource());
         setNotice("Live elevation isn’t available here, so this is sample terrain. Choose one of the suggested places to see a real landscape.");
       })
       .finally(() => {
@@ -93,43 +104,44 @@ export function Configurator() {
                 ? <>{(place.lengthM / 1000).toFixed(1)} km across · relief {stats.exaggeration.toFixed(1)}× · approx. {stats.massG.toFixed(1)} g of metal</>
                 : <>Preparing your landscape</>}
               {terrainOrigin !== "live" && (
-                <span className="origin-tag">{terrainOrigin === "saved" ? "Saved terrain" : "Sample terrain"}</span>
+                <span className="origin-tag">{terrainOrigin === "saved" ? "Cached elevation" : "Example terrain"}</span>
               )}
             </p>
             <p className="quote-line">Priced by written quote · nothing is made until you approve it</p>
             {stats?.terrainAdjusted && <p className="hint">Steep edge detail has been softened where the terrain meets the shoulders.</p>}
           </div>
           {webgl ? (
-            source && <RingViewer source={source} onStats={setStats} />
+            source && <PreviewBoundary><RingViewer source={source} onStats={setStats} /></PreviewBoundary>
           ) : (
-            <ErrorBanner tone="info">3D preview isn’t available on this device. You can still design your ring, and we’ll send renders before anything is made.</ErrorBanner>
+            <><ProductImage name={`ring-${headShape}-${weight}`} /><ErrorBanner tone="info">3D preview isn’t available on this device. You can still choose options and review their dimensions. Try another browser for the interactive model.</ErrorBanner></>
           )}
           {loading && !source && <LoadingOverlay label="Preparing your landscape…" />}
           {loading && source && <div className="pill-loading">Updating landscape…</div>}
           {notice && <ErrorBanner>{notice}</ErrorBanner>}
           <p className="stage-foot">
-            A sculptural interpretation of real elevation data. Hand finishing softens the finest detail. Drag to turn the ring.
+            A place, made personal. Use the view buttons to explore your ring. Hand finishing may soften fine detail.
           </p>
         </section>
 
         <aside className="panel">
           <div className="step-head">
-            <button className="icon-btn" disabled={step === 0} onClick={() => setStep(step - 1)} aria-label="Previous step">‹</button>
-            <h2>{STEPS[step]} <span className="num">{step + 1}/{STEPS.length}</span></h2>
-            <button className="icon-btn" disabled={last} onClick={() => setStep(step + 1)} aria-label="Next step">›</button>
+            <button className="icon-btn" disabled={step === 0} onClick={() => navigate(step - 1)} aria-label="Previous step">‹</button>
+            <h2 ref={headingRef} tabIndex={-1}>{STEPS[step]} <span className="num">{step + 1}/{STEPS.length}</span></h2>
+            <button className="icon-btn" disabled={last} onClick={() => navigate(step + 1)} aria-label="Next step">›</button>
           </div>
-          <div className="step-body">
+          <div className="step-body" ref={bodyRef}>
+            {step === 0 && <Collection />}
             {step === 0 && <StepLocation />}
             {step === 1 && <StepLandscape exaggeration={stats?.exaggeration ?? null} />}
             {step === 2 && <StepRing />}
-            {step === 3 && <StepReview stats={stats} showCartMessage={cartMessage} />}
+            {step === 3 && <StepReview stats={stats} showCartMessage={cartMessage} onEdit={navigate} />}
           </div>
           <footer className="stepper">
             <div className="stepper-main">
               <ol>
                 {STEPS.map((name, i) => (
                   <li key={name} className={i < step ? "done" : i === step ? "current" : ""}>
-                    <button onClick={() => setStep(i)} aria-label={`Step ${i + 1}: ${name}`} aria-current={i === step ? "step" : undefined}>
+                    <button onClick={() => navigate(i)} aria-label={`Step ${i + 1}: ${name}`} aria-current={i === step ? "step" : undefined}>
                       <span className="bar" aria-hidden="true" />
                       <span className="step-number">{String(i + 1).padStart(2, "0")}</span><span>{name}</span>
                     </button>
@@ -144,10 +156,10 @@ export function Configurator() {
                 if (last) {
                   setCartMessage(true);
                   track("quote_next_steps_viewed");
-                } else setStep(step + 1);
+                } else navigate(step + 1);
               }}
             >
-              {last ? "Next steps" : "Continue"}
+              {last ? "How to enquire" : "Continue"}
             </button>
           </footer>
         </aside>

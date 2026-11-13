@@ -11,6 +11,7 @@ const style = readFileSync(`dist/${css}`, "utf8");
 rmSync("artifact", { recursive: true, force: true });
 mkdirSync("artifact", { recursive: true });
 cpSync("dist/baked", "artifact/baked", { recursive: true });
+cpSync("dist/products", "artifact/products", { recursive: true });
 writeFileSync("artifact/index.html", `<title>À Vie Terrain Ring</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,24 +20,6 @@ writeFileSync("artifact/index.html", `<title>À Vie Terrain Ring</title>
 html, body { height: 100%; background: #EFECEC; color: #585757; }
 ${style}
 </style>
-<nav class="review-switch" aria-label="Preview">
-  <a href="#">Ring</a><a href="#pendant-preview">Pendant prototype (internal)</a>
-</nav>
-<style>
-.review-switch { position: fixed; z-index: 50; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 2px; padding: 3px; background: #EFECEC; border: 1px solid #3F5147; border-radius: 999px; font: 500 13px/1 Inter, system-ui, sans-serif; }
-.review-switch a { padding: 7px 12px; border-radius: 999px; color: #3F5147; text-decoration: none; }
-.review-switch a[aria-current="page"] { background: #3F5147; color: #EFECEC; }
-</style>
-<script>
-(() => {
-  const mark = () => document.querySelectorAll(".review-switch a").forEach((a) => {
-    const on = (a.getAttribute("href") === "#pendant-preview") === (location.hash === "#pendant-preview");
-    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
-  });
-  addEventListener("hashchange", mark);
-  mark();
-})();
-</script>
 <div id="root"></div>
 <script type="module">
 ${script}

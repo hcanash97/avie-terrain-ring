@@ -16,6 +16,7 @@ const PREVIEW_SIZE = "N"; // used for the preview when the customer sizes later
 export function RingViewer({ source, onStats }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneContext | null>(null);
+  const [interactive, setInteractive] = useState(() => !window.matchMedia("(pointer: coarse)").matches);
   const [quality, setQuality] = useState<Quality>("high");
   const [simplified, setSimplified] = useState(false);
   const [sceneVersion, setSceneVersion] = useState(0);
@@ -65,6 +66,8 @@ export function RingViewer({ source, onStats }: Props) {
       sceneRef.current = null;
     };
   }, [sceneVersion, createScene]);
+
+  useEffect(() => { sceneRef.current?.setInteraction(interactive); }, [interactive, sceneVersion]);
 
   useEffect(() => { sceneRef.current?.setView(view); }, [view, sceneVersion]);
 
@@ -117,7 +120,7 @@ export function RingViewer({ source, onStats }: Props) {
     <>
       <div ref={containerRef} className="viewer" aria-label="3D preview of your Terra ring. Drag to rotate. Use the zoom buttons to change scale." />
       <div className="view-bar" role="group" aria-label="Camera views">
-        <button title="Rebuild lighting and materials without changing your design" onClick={() => { setContextLost(false); setSceneVersion((v) => v + 1); }}>Reset preview</button>
+        <button className="touch-rotation" aria-pressed={interactive} onClick={() => setInteractive((v) => !v)}>{interactive ? "Finish rotating" : "Rotate by touch"}</button>
         <button aria-label="Zoom out" onClick={() => sceneRef.current?.zoom(1.18)}>−</button>
         <button aria-label="Zoom in" onClick={() => sceneRef.current?.zoom(0.85)}>+</button>
         {VIEW_LABELS.map(([v, label]) => (
@@ -125,6 +128,7 @@ export function RingViewer({ source, onStats }: Props) {
             key={v}
             className={view === v ? "on" : ""}
             aria-pressed={view === v}
+            aria-label={v === "three_quarter" ? "Three-quarter view" : `${label} view`}
             title={v === "three_quarter" ? "Reset to the default view" : `${label} view`}
             onClick={() => { setView(v); sceneRef.current?.setView(v); }}
           >
@@ -144,7 +148,7 @@ export function RingViewer({ source, onStats }: Props) {
         }}>Build comparison sheet</button>
         {comparison && <span role="status">{comparison}</span>}
       </details>}
-      {contextLost && <div className="notice" role="status">Restoring the 3D preview… Your design is retained.</div>}
+      {contextLost && <div className="notice" role="status">Restoring the 3D preview… Your design is retained. <button onClick={() => { setContextLost(false); setSceneVersion((v) => v + 1); }}>Retry preview</button></div>}
       {simplified && (
         <div className="notice">Preview detail reduced to keep rotation smooth.</div>
       )}

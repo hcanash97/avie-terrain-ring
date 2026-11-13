@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   base: "./",
+  define: { "import.meta.env.VITE_INTERNAL_REVIEW": JSON.stringify(process.env.ARTIFACT ? "true" : process.env.VITE_INTERNAL_REVIEW ?? "false") },
   build: {
     // The single-file review page cannot fetch extra files, so it also inlines
     // the pendant boolean engine's WASM; normal builds serve it as a file.

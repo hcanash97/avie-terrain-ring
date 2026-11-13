@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
+/** Native radios retain browser arrow-key behaviour and a single tab stop per group. */
 export function Choice<T extends string>(props: {
   label: ReactNode;
   value: T;
@@ -7,26 +8,22 @@ export function Choice<T extends string>(props: {
   onChange: (v: T) => void;
   variant?: "plain" | "card";
 }) {
+  const name = useId();
   return (
-    <div className="choice">
-      <span className="choice-label">{props.label}</span>
-      <div className={`choice-row ${props.variant ?? "plain"}`} role="radiogroup">
-        {props.options.map((o) => (
-          <button
-            key={o.value}
-            role="radio"
-            aria-checked={props.value === o.value}
-            className={props.value === o.value ? "on" : ""}
-            onClick={() => props.onChange(o.value)}
-          >
-            {o.icon}
-            <span>
-              {o.label}
-              {o.note && <small>{o.note}</small>}
-            </span>
-          </button>
-        ))}
+    <fieldset className="choice">
+      <legend className="choice-label">{props.label}</legend>
+      <div className={`choice-row ${props.variant ?? "plain"}`}>
+        {props.options.map((o) => {
+          const id = `${name}-${o.value}`;
+          return <label key={o.value} className={`choice-option ${props.value === o.value ? "on" : ""}`}>
+            <input type="radio" aria-label={o.label} name={name} value={o.value} checked={props.value === o.value}
+              aria-describedby={o.note ? `${id}-note` : undefined} onChange={() => props.onChange(o.value)} />
+            {o.icon && <span className="choice-visual" aria-hidden="true">{o.icon}</span>}
+            <span className="choice-title">{o.label}</span>
+            {o.note && <small id={`${id}-note`}>{o.note}</small>}
+          </label>;
+        })}
       </div>
-    </div>
+    </fieldset>
   );
 }

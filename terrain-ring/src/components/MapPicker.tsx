@@ -104,7 +104,7 @@ export function MapPicker() {
   }, [satellite, attempt]);
 
   return (
-    <div className="map-wrap">
+    <div className={`map-wrap ${tilesFailed ? "is-offline" : ""}`}>
       <div ref={mapEl} className="map" />
       <div
         className="frame"
@@ -118,8 +118,8 @@ export function MapPicker() {
         <span className="frame-top">▲</span>
       </div>
       {tilesFailed && (
-        <div className="map-offline" role="alert">
-          <p>The map couldn’t load here. You can still choose one of the places above, which use saved terrain.</p>
+        <div className="map-offline" role="status">
+          <p>The map couldn’t load here. You can still choose one of the places above, which use cached elevation.</p>
           <button className="btn-secondary" onClick={() => { setTilesFailed(false); setAttempt((n) => n + 1); }}>Retry map</button>
         </div>
       )}

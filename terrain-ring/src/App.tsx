@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { PreviewBoundary } from "./components/PreviewBoundary";
 import { Configurator } from "./components/Configurator";
 
 // Internal prototype preview, loaded only when its address is opened.
@@ -16,9 +17,9 @@ export function App() {
   }, []);
   if (hash === PENDANT_HASH)
     return (
-      <Suspense fallback={null}>
+      <PreviewBoundary route><Suspense fallback={<main className="route-loading" role="status">Preparing pendant preview…</main>}>
         <PendantPreview />
-      </Suspense>
+      </Suspense></PreviewBoundary>
     );
   return <Configurator />;
 }

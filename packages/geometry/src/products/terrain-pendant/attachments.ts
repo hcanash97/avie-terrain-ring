@@ -38,11 +38,21 @@ export function configureManifoldWasm(url: string) {
   wasmUrl = url;
 }
 
-const manifold = () =>
-  (wasmPromise ??= (wasmUrl ? Module({ locateFile: () => wasmUrl! }) : Module()).then((w) => {
-    w.setup();
-    return w;
-  }));
+const manifold = () => {
+  if (!wasmPromise) {
+    // Single-file review hosts may block fetch(data:). Decode the bundled bytes
+    // directly instead of asking Emscripten to fetch its inline asset.
+    const inline = wasmUrl?.startsWith("data:application/wasm;base64,")
+      ? Uint8Array.from(atob(wasmUrl.split(",")[1]!), (c) => c.charCodeAt(0))
+      : undefined;
+    // The package’s declaration omits Emscripten’s supported wasmBinary option.
+    const options = { locateFile: () => wasmUrl!, ...(inline ? { wasmBinary: inline } : {}) };
+    wasmPromise = (wasmUrl ? Module(options) : Module())
+      .then((w) => { w.setup(); return w; })
+      .catch((error: unknown) => { wasmPromise = null; throw error; });
+  }
+  return wasmPromise;
+};
 
 /** Closed ring: a section swept round an ellipse in the Y–Z plane (opening along X). */
 function sweptLoop(centre: { y: number; z: number }, ay: number, az: number, section: [number, number][], segments: number) {

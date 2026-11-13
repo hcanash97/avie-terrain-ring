@@ -1,6 +1,7 @@
 import { useRingStore } from "../state/ringStore";
 import { METALS, type Finish, type Metal } from "../three/materials";
 import { facePreset, HEAD_SHAPES, WEIGHTS, type BandProfile, type HeadShape, type ShoulderStyle, type Weight } from "../geometry/ring-blank";
+import { ProductImage } from "./ProductImage";
 import { Choice } from "./Choice";
 import { track } from "../lib/analytics";
 
@@ -31,13 +32,14 @@ export function StepRing() {
 
   return (
     <div className="stack">
+      <p className="intro">Choose the silhouette, then make it yours. All style images show the same example landscape.</p>
       <Choice<HeadShape>
         label="Head shape"
         variant="card"
         value={s.headShape}
         options={[
-          { value: "bar", label: HEAD_SHAPES.bar, icon: icon("M6 17 H54 V33 H6 Z") },
-          { value: "cushion", label: HEAD_SHAPES.cushion, icon: icon("M18 6 H42 Q52 6 52 16 V34 Q52 44 42 44 H18 Q8 44 8 34 V16 Q8 6 18 6 Z") }
+          { value: "bar", label: HEAD_SHAPES.bar, note: "An elongated face for a sweeping landscape.", icon: <ProductImage name="ring-bar-standard" /> },
+          { value: "cushion", label: HEAD_SHAPES.cushion, note: "A broader face with softly rounded corners.", icon: <ProductImage name="ring-cushion-standard" /> }
         ]}
         onChange={(headShape) => change({ headShape })}
       />
@@ -48,31 +50,28 @@ export function StepRing() {
         options={(Object.keys(WEIGHTS) as Weight[]).map((w) => ({
           value: w,
           label: WEIGHTS[w].label,
+          icon: <ProductImage name={`ring-${s.headShape}-${w}`} />,
           note: `${facePreset(w, s.headShape).faceLengthMm} × ${facePreset(w, s.headShape).faceWidthMm} mm face · ${WEIGHTS[w].bandWidthMm} mm band`
         }))}
         onChange={(weight) => change({ weight })}
       />
-      <div className="choice">
-        <span className="choice-label">Metal · <strong>{METALS[s.metal].label}</strong></span>
+      <fieldset className="choice">
+        <legend className="choice-label">Metal · <strong>{METALS[s.metal].label}</strong></legend>
         <div className="swatches">
           {(Object.keys(METALS) as Metal[]).map((m) => (
-            <button
-              key={m}
-              className={`swatch ${s.metal === m ? "on" : ""}`}
-              onClick={() => change({ metal: m })}
-              aria-pressed={s.metal === m}
-              aria-label={METALS[m].label}
-            >
-              <i style={{ background: `#${METALS[m].color.toString(16)}` }} />
+            <label key={m} className={`swatch ${s.metal === m ? "on" : ""}`}>
+              <input type="radio" name="ring-metal" checked={s.metal === m} onChange={() => change({ metal: m })} aria-label={METALS[m].label} />
+              <i aria-hidden="true" style={{ background: `#${METALS[m].color.toString(16)}` }} />
               <span>{METALS[m].short}</span>
-            </button>
+            </label>
           ))}
         </div>
-      </div>
+        <p className="hint">Colours are illustrative. Alloy and finish are confirmed with your written quote.</p>
+      </fieldset>
       <Choice<Finish>
         label="Finish"
         value={s.finish}
-        options={[{ value: "polished", label: "Polished" }, { value: "satin", label: "Satin" }]}
+        options={[{ value: "polished", label: "Polished", note: "Bright, reflective highlights." }, { value: "satin", label: "Satin", note: "A softer, less reflective surface." }]}
         onChange={(finish) => change({ finish })}
       />
       <Choice<ShoulderStyle>
@@ -80,7 +79,7 @@ export function StepRing() {
         variant="card"
         value={s.shoulder}
         options={(["straight", "classic", "curved"] as ShoulderStyle[]).map((v) => ({
-          value: v, label: v[0]!.toUpperCase() + v.slice(1), icon: icon(SHOULDER_ICONS[v])
+          value: v, label: v[0]!.toUpperCase() + v.slice(1), note: { straight: "A direct, gradual taper.", classic: "A fuller, traditional transition.", curved: "A more sculpted, inward taper." }[v], icon: icon(SHOULDER_ICONS[v])
         }))}
         onChange={(shoulder) => change({ shoulder })}
       />
@@ -89,9 +88,9 @@ export function StepRing() {
         variant="card"
         value={s.profile}
         options={[
-          { value: "flat", label: "Flat", icon: icon(PROFILE_ICONS.flat) },
-          { value: "classic", label: "Comfort", icon: icon(PROFILE_ICONS.classic) },
-          { value: "d_shape", label: "D-shape", icon: icon(PROFILE_ICONS.d_shape) }
+          { value: "flat", label: "Flat", note: "A flatter band section.", icon: icon(PROFILE_ICONS.flat) },
+          { value: "classic", label: "Comfort", note: "Rounded inner and outer contours.", icon: icon(PROFILE_ICONS.classic) },
+          { value: "d_shape", label: "D-shape", note: "A domed outside, flatter inside.", icon: icon(PROFILE_ICONS.d_shape) }
         ]}
         onChange={(profile) => change({ profile })}
       />

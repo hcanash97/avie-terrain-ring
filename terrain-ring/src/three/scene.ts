@@ -27,6 +27,7 @@ export type SceneContext = {
   setClay: (on: boolean) => void;
   setView: (view: ViewName) => void;
   zoom: (factor: number) => void;
+  setInteraction: (enabled: boolean) => void;
   simulateContextRecovery: () => void;
   dispose: () => void;
 };
@@ -198,6 +199,10 @@ export function createScene(
       const [x, y, z] = VIEWS[view];
       camera.position.set(x, y, z);
       fit(new THREE.Vector3(x, y, z).sub(TARGET));
+    },
+    setInteraction(enabled) {
+      controls.enabled = enabled;
+      renderer.domElement.style.touchAction = enabled ? "none" : "pan-y";
     },
     zoom(factor) {
       const offset = camera.position.clone().sub(controls.target);

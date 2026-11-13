@@ -1,3 +1,4 @@
+import { Choice } from "./Choice";
 import { useRingStore } from "../state/ringStore";
 import { useTerrainStore } from "../state/terrainStore";
 import { UK_RING_SIZES, getInnerDiameterMm } from "../geometry/ring-sizing";
@@ -7,20 +8,14 @@ import type { PreviewStats } from "./RingViewer";
 
 const PROFILE_LABEL = { flat: "flat", classic: "comfort", d_shape: "D-shape" } as const;
 
-export function StepReview({ stats, showCartMessage }: { stats: PreviewStats | null; showCartMessage: boolean }) {
+export function StepReview({ stats, showCartMessage, onEdit }: { stats: PreviewStats | null; showCartMessage: boolean; onEdit?: (step: number) => void }) {
   const ring = useRingStore();
   const terrain = useTerrainStore();
   const later = ring.ringSize === null;
 
   return (
     <div className="stack">
-      <div className="choice">
-        <span className="choice-label">Ring size</span>
-        <div className="choice-row" role="radiogroup" aria-label="Ring size">
-          <button role="radio" aria-checked={!later} className={!later ? "on" : ""} onClick={() => ring.set({ ringSize: ring.ringSize ?? "N" })}>I know my size</button>
-          <button role="radio" aria-checked={later} className={later ? "on" : ""} onClick={() => ring.set({ ringSize: null })}>Size later</button>
-        </div>
-      </div>
+      <Choice label="Ring size" value={later ? "later" : "known"} options={[{ value: "known", label: "I know my size" }, { value: "later", label: "Confirm later" }]} onChange={(v) => ring.set({ ringSize: v === "later" ? null : ring.ringSize ?? "N" })} />
       {later ? (
         <div className="card-note">
           <strong>Confirm your size later</strong>
@@ -41,6 +36,8 @@ export function StepReview({ stats, showCartMessage }: { stats: PreviewStats | n
         </label>
       )}
 
+      <h3>Your design at a glance</h3>
+      {onEdit && <div className="review-edits" aria-label="Edit your design">{["Place", "Landscape", "Ring"].map((label, i) => <button key={label} className="link" onClick={() => onEdit(i)}>Edit {label.toLowerCase()}</button>)}</div>}
       <dl className="summary num">
         <dt>Place</dt><dd>{terrain.place.name}, {(terrain.place.lengthM / 1000).toFixed(1)} km across, {Math.round(terrain.bearingDeg)}° from north</dd>
         <dt>Landscape</dt><dd>{Math.round(terrain.terrainHeight * 100)}% height{stats ? ` (${stats.exaggeration.toFixed(1)}× true scale)` : ""}, {terrain.detail === "high" ? "fine" : terrain.detail === "medium" ? "balanced" : "soft"} detail</dd>
