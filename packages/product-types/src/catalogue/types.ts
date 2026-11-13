@@ -7,9 +7,11 @@
  *   - Overall dimensions include attachments and are reported by the generator.
  *   - Base thickness: body below the terrain baseline. Terrain relief: height
  *     above that baseline. Overall depth: front to back including relief.
- *   - Flat products: origin at the body centre on the back plane, +Y towards
- *     the viewer (relief), +Z up towards the attachment, +X to the right seen
- *     from the front. Rings keep their existing convention (ring axis = Z).
+ *   - Flat products (right-handed, the piece lying face-up): origin at the
+ *     body centre on the back plane, +Y the relief direction, +X right seen
+ *     from the front with the attachment at the top, attachment towards −Z.
+ *     Terrain north points towards the attachment. Rings keep their existing
+ *     convention (ring axis = Z, relief +Y).
  *
  * A preset in this catalogue is NOT a launch decision. What a preset may be
  * used for is decided by `availabilityOf`, from the explicit enabled list plus

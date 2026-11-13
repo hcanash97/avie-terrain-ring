@@ -24,9 +24,10 @@ export const ENABLED_PRESETS: Readonly<Record<string, Partial<Availability>>> = 
   "ring-cushion-slim": { prototype: true, internalPreview: true, customerEnquiry: true },
   "ring-cushion-standard": { prototype: true, internalPreview: true, customerEnquiry: true },
   "ring-cushion-bold": { prototype: true, internalPreview: true, customerEnquiry: true },
-  // First pendant prototype candidates: prototype work only (no geometry yet).
+  // First pendant prototype: internal preview of the 18 mm round only, using the
+  // preview-only profile. Petite and statement stay prototype-only.
   "pendant-round-petite": { prototype: true },
-  "pendant-round-classic": { prototype: true },
+  "pendant-round-classic": { prototype: true, internalPreview: true },
   "pendant-round-statement": { prototype: true },
 });
 

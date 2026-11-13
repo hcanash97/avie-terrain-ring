@@ -5,6 +5,7 @@
 import type { SpecOwner, SpecValue } from "@avie/shared-types";
 import { availabilityOf, type Availability } from "./availability";
 import { GEMSTONE_REQUIREMENTS, GEMSTONE_TREATMENTS } from "./gemstones";
+import { PENDANT_PREVIEW_PROFILE } from "./preview-profiles";
 import { RING_STYLES } from "./ring";
 import type { Family, Preset } from "./types";
 
@@ -94,7 +95,9 @@ export function renderUnresolvedDecisions(catalogue: readonly Preset[]): string 
     "## Proposed and preview-only values",
     "",
     `- ${proposed.length} proposed values across ${new Set(proposed).size} families (body dimensions and outline choices; the ring's sizing-table version). Proposed means a candidate for comparison, not approval.`,
-    `- Preview-only values: ${previewOnly.length ? previewOnly.join("; ") : "none yet (the pendant preview profile arrives with Milestone B)"}.`,
+    `- Preview-only values inside presets: ${previewOnly.length ? previewOnly.join("; ") : "none"}.`,
+    `- Preview-only profile \`${PENDANT_PREVIEW_PROFILE.id}\` (for ${PENDANT_PREVIEW_PROFILE.appliesTo.join(", ")}; lets the prototype render, never production):`,
+    ...Object.entries(PENDANT_PREVIEW_PROFILE.values).map(([k, v]) => `  - \`${k}\`: ${v.value} — ${v.note}`),
     "",
     "## Gemstone treatments (all rejected until approved)",
     "",
@@ -112,7 +115,7 @@ export function renderUnresolvedDecisions(catalogue: readonly Preset[]): string 
     "",
     "- Outline generators (circle, ellipse, rounded rectangle, tablet, across-flats hexagon) and tessellation density, with dimensional-error tests.",
     "- Landscape crop and mask for non-rectangular bodies: crop to the body's own aspect and mask; never stretch.",
-    "- Coordinate convention for flat products: origin at the body centre on the back plane; +Y relief, +Z towards the attachment, +X right (see `catalogue/types.ts`).",
+    "- Coordinate convention for flat products (right-handed, lying face-up): origin at the body centre on the back plane; +Y relief, +X right, attachment towards −Z; terrain north towards the attachment (see `catalogue/types.ts`).",
     "- Preview-only edge radii and attachment proportions, listed as preview-only and blocked from release.",
     "",
     "## Known conflicts to resolve",
