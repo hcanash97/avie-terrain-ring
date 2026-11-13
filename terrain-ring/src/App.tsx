@@ -6,6 +6,7 @@ import { Configurator } from "./components/Configurator";
 const PendantPreview = lazy(() => import("./components/PendantPreview").then((m) => ({ default: m.PendantPreview })));
 
 const PENDANT_HASH = "#pendant-preview";
+const CHARM_HASH = "#charm-preview";
 
 export function App() {
   // Follow the address so a link can switch views without a full reload.
@@ -15,10 +16,10 @@ export function App() {
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);
-  if (hash === PENDANT_HASH)
+  if (hash === PENDANT_HASH || hash === CHARM_HASH)
     return (
-      <PreviewBoundary route><Suspense fallback={<main className="route-loading" role="status">Preparing pendant preview…</main>}>
-        <PendantPreview />
+      <PreviewBoundary route><Suspense fallback={<main className="route-loading" role="status">Preparing preview…</main>}>
+        <PendantPreview key={hash} initialProduct={hash === CHARM_HASH ? "charm" : "pendant"} />
       </Suspense></PreviewBoundary>
     );
   return <Configurator />;

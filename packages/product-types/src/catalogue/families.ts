@@ -385,14 +385,14 @@ const tieSlides = expand({
   notes: ["Dimensions describe the visible decorative face only.", "Bespoke enquiry only at first."],
 });
 
-/** Pendant prototypes: round, tablet and cushion in every size tier have review-only geometry. */
+/** Pendant and charm prototypes: round, tablet and cushion in every size tier have review-only geometry. */
 const PROTOTYPE_SHAPES = ["round", "tablet", "cushion"];
-const withPrototype = (ps: Preset[]) =>
-  ps.map((p) => (PROTOTYPE_SHAPES.some((s) => p.id.startsWith(`pendant-${s}-`)) ? { ...p, status: { ...p.status, implementation: "prototype" as const } } : p));
+const withPrototype = (ps: Preset[], prefix: string) =>
+  ps.map((p) => (PROTOTYPE_SHAPES.some((s) => p.id.startsWith(`${prefix}-${s}-`)) ? { ...p, status: { ...p.status, implementation: "prototype" as const } } : p));
 
 export const familyPresets: Preset[] = [
-  ...withPrototype(pendants),
-  ...charms,
+  ...withPrototype(pendants, "pendant"),
+  ...withPrototype(charms, "charm"),
   ...studs,
   ...drops,
   ...chainBracelets,

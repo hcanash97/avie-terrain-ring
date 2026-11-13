@@ -47,3 +47,17 @@ export const unknownPendantChainSpecification = () => pendantChainSpecificationS
   assemblyRoute: spec.awaitingSupplier("Threading orientation and assembly route, including clasp and connectors."),
   clearanceAllowanceMm: spec.awaitingManufacturer("Clearance required around the chosen chain and fittings."),
 });
+
+/**
+ * Charm prototype contract: a small terrain piece on a fixed loop that lies in
+ * the plane of the face, for a jump ring or clasp. Internal preview only.
+ */
+export const charmStyleIdSchema = z.enum(["round_charm", "cushion_charm", "tablet_charm"]);
+export type CharmStyleId = z.infer<typeof charmStyleIdSchema>;
+export const charmPrototypeSelectionSchema = z.strictObject({
+  productType: z.literal("terrain_charm"),
+  contractVersion: z.literal(1),
+  configurationVersion: versionSchema,
+  presetId: z.string().regex(/^charm-(round|tablet|cushion)-(petite|classic|larger)$/),
+  style: charmStyleIdSchema,
+});

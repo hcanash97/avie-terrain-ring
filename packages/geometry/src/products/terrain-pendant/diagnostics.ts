@@ -4,7 +4,7 @@
  *   channel   metal above, behind and in front of the chain channel, from the
  *             design parameters (the body is flat there; terrain only adds metal
  *             in front)
- *   loop/tab  cross-section area measured by slicing the actual mesh: just above
+ *   loop/tab/eye  cross-section area measured by slicing the actual mesh: just above
  *             the top edge (where the attachment meets the body) and through
  *             the centre of the opening (both legs)
  */
@@ -67,6 +67,21 @@ export function attachmentDiagnostics(m: Mesh, outline: PendantOutline, baseThic
       openingMm: { height: a.openingHeightMm, frontToBack: a.openingDepthMm },
       sectionMm: a.kind === "loop" ? { wireDiameter: a.wallMm } : { width: a.widthMm, thickness: a.thicknessMm },
       junctionSlice: { planeMmAboveTopEdge: 0.05, areaMm2: r3(junction.areaMm2), widthMm: r3(junction.widthMm), note: "Both legs, just above where the attachment meets the body." },
+      openingCentreSlice: { areaMm2: r3(middle.areaMm2), note: "Both legs, through the centre of the opening." },
+      embedMm: a.embedMm,
+    };
+  }
+  if (a.kind === "eye") {
+    const az = a.openingHeightMm / 2 + a.wallMm / 2;
+    const centreZ = top - az - a.wallMm / 2 + a.embedMm;
+    const junction = sectionAtZ(m, top - 0.05);
+    const middle = sectionAtZ(m, centreZ);
+    return {
+      kind: a.kind,
+      method: "planar slices of the finished mesh at constant height",
+      openingMm: { height: a.openingHeightMm, width: a.openingWidthMm, direction: "front to back (the loop lies in the plane of the face)" },
+      sectionMm: { wireDiameter: a.wallMm },
+      junctionSlice: { planeMmAboveTopEdge: 0.05, areaMm2: r3(junction.areaMm2), widthMm: r3(junction.widthMm), note: "Both legs, just above where the loop meets the body." },
       openingCentreSlice: { areaMm2: r3(middle.areaMm2), note: "Both legs, through the centre of the opening." },
       embedMm: a.embedMm,
     };

@@ -10,7 +10,7 @@ All non-ring dimensions are **proposed aesthetic presets for prototypes**, not a
 |---|---:|---|---|---:|---:|---:|---:|---:|
 | Ring | 6 | implemented | enquiry_only | 6 | 6 | 6 | 0 | 0 |
 | Pendant | 15 | prototype, planned | hidden | 9 | 9 | 0 | 0 | 0 |
-| Charm | 12 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
+| Charm | 12 | prototype, planned | hidden | 9 | 9 | 0 | 0 | 0 |
 | Stud earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Drop earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Chain bracelet | 12 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
