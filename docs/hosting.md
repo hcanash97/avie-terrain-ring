@@ -20,7 +20,7 @@ In the Cloudflare dashboard, open the `avie-terra-ring` Worker and go to **Setti
 | --- | --- |
 | Root directory | `/` (the repository root). Leave the field empty if an empty value means the root. Do not set `terrain-ring`. |
 | Production branch | `main` |
-| Build command | `npm run build:site` |
+| Build command | `npm run build` |
 | Deploy command | `npx wrangler deploy` |
 | Preview command | `npx wrangler preview` |
 
@@ -40,7 +40,7 @@ npx wrangler deploy         # production
 npx wrangler preview        # preview for the current branch; does not replace production
 ```
 
-`npm run build:site` installs dev dependencies as well (`--include=dev`). The Vite build depends on them. Workers Builds installs the root lockfile before the build command, but `terrain-ring` is not a root workspace, so the build command still has to install it. `build:site` installs both, which also makes the command enough on its own.
+`npm run build` and `npm run build:site` are the same command. `build:site` installs dev dependencies as well (`--include=dev`). The Vite build depends on them. Workers Builds installs the root lockfile before the build command, but `terrain-ring` is not a root workspace, so the build command still has to install it. The root `package.json` has no other `build` script; the dashboard's usual `npm run build` has to be this one, or the build stops before `terrain-ring/dist` exists.
 
 ### What can fail on the build image
 

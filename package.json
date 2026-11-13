@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build:site",
     "build:site": "npm ci --include=dev && npm --prefix terrain-ring ci --include=dev && npm --prefix terrain-ring run build",
     "test": "vitest run",
     "test:all": "npm test && npm --prefix terrain-ring test",
