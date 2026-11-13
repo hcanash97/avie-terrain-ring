@@ -1,37 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { availabilityOf, getPreset, PENDANT_PREVIEW_PROFILE } from "@avie/product-types";
+import { useEffect, useRef, useState } from "react";
+import { availabilityOf, getPreset, PENDANT_STYLES, type PendantStyleId } from "@avie/product-types";
 import { createScene, type SceneContext, type ViewName } from "../three/scene";
 import { loadBakedSource } from "../three/heightmap-loader";
 import { METALS, type Metal } from "../three/materials";
 import { PRESET_PLACES } from "../state/terrainStore";
 import type { TerrainSource } from "../geometry/heightmap";
 import { METAL_DENSITY_G_CM3 } from "../geometry/ring-blank";
-import { buildPendantPreview, pendantDisplayMesh, PENDANT_PRESET_ID } from "../geometry/pendant-preview";
+import { buildPendantPreview, pendantDisplayMesh, presetFor, SIZE_TIERS, type SizeTier } from "../geometry/pendant-preview";
+
+type Built = Awaited<ReturnType<typeof buildPendantPreview>>;
 
 /**
- * Internal prototype preview of the first pendant (#pendant-preview). Not linked
+ * Internal prototype preview of the pendant styles (#pendant-preview). Not linked
  * from the customer configurator; shows every preview-only value it relies on.
  */
 export function PendantPreview() {
-  const preset = getPreset(PENDANT_PRESET_ID);
-  const allowed = availabilityOf(preset).allowed.internalPreview;
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneContext | null>(null);
+  const [style, setStyle] = useState<PendantStyleId>("circle");
+  const [tier, setTier] = useState<SizeTier>("classic");
+  const [coverageMode, setCoverageMode] = useState<"style" | "full" | "above_level">("style");
+  const [level, setLevel] = useState(0.3);
   const [placeName, setPlaceName] = useState(PRESET_PLACES[0]!.name);
   const [source, setSource] = useState<TerrainSource | null>(null);
-  const [terrainHeight, setTerrainHeight] = useState(0.7);
+  const [terrainHeight, setTerrainHeight] = useState(0.8);
   const [bearingDeg, setBearingDeg] = useState(0);
-  const [metal, setMetal] = useState<Metal>("gold_9ct");
+  const [metal, setMetal] = useState<Metal>("silver_925");
   const [clay, setClay] = useState(false);
   const [view, setView] = useState<ViewName>("front");
+  const [built, setBuilt] = useState<Built | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const place = PRESET_PLACES.find((p) => p.name === placeName)!;
+  const preset = getPreset(presetFor(style, tier));
+  const allowed = availabilityOf(preset).allowed.internalPreview;
+  const styleInfo = PENDANT_STYLES[style];
 
   useEffect(() => {
-    if (!allowed || !containerRef.current) return;
+    if (!containerRef.current) return;
     const context = createScene(containerRef.current, { pixelRatioCap: 2 });
     sceneRef.current = context;
     return () => { context.dispose(); sceneRef.current = null; };
-  }, [allowed]);
+  }, []);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -40,20 +49,26 @@ export function PendantPreview() {
     return () => abort.abort();
   }, [placeName]);
 
-  const built = useMemo(
-    () => (source ? buildPendantPreview({ source, lengthM: place.lengthM, bearingDeg, terrainHeight, detail: "high", flat: false }) : null),
-    [source, place.lengthM, bearingDeg, terrainHeight],
-  );
+  useEffect(() => {
+    if (!source || !allowed) return;
+    let cancelled = false;
+    const coverage = coverageMode === "style" ? undefined : coverageMode === "full" ? { mode: "full" as const } : { mode: "above_level" as const, level };
+    const id = setTimeout(() => {
+      buildPendantPreview({ style, tier, coverage, source, lengthM: place.lengthM, bearingDeg, terrainHeight, detail: "high" })
+        .then((b) => { if (!cancelled) { setBuilt(b); setError(null); } })
+        .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
+    }, 80);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [source, allowed, style, tier, coverageMode, level, place.lengthM, bearingDeg, terrainHeight]);
 
-  useEffect(() => { if (built) sceneRef.current?.setRing(pendantDisplayMesh(built.pendant)); }, [built]);
+  useEffect(() => { if (built) sceneRef.current?.setRing(pendantDisplayMesh(built.built.mesh)); }, [built]);
   useEffect(() => { sceneRef.current?.setMaterial(metal, "polished"); }, [metal, built]);
   useEffect(() => { sceneRef.current?.setClay(clay); }, [clay, built]);
   useEffect(() => { sceneRef.current?.setView(view); }, [view, built]);
 
-  if (!allowed) return <main className="pendant-preview"><p>The pendant prototype preview is not enabled.</p></main>;
-  const d = built?.dimensions;
-  const massG = d ? ((d.body.volumeMm3 + (d.bail?.volumeMm3 ?? 0)) / 1000) * METAL_DENSITY_G_CM3[metal] : null;
-  const unresolved = Object.keys(preset.manufacturing);
+  const d = built?.built.dimensions;
+  const massG = d ? (d.volumeMm3 / 1000) * METAL_DENSITY_G_CM3[metal] : null;
+  const coverage = built?.params.coverage;
 
   return (
     <main className="pendant-preview">
@@ -66,8 +81,18 @@ export function PendantPreview() {
         </div>
       </section>
       <aside className="pendant-panel">
-        <p className="pendant-warning" role="note"><strong>Internal prototype preview.</strong> Not for sale and not for production. Built with the preview-only profile <code>{PENDANT_PREVIEW_PROFILE.id}</code>.</p>
-        <h1>{preset.label}</h1>
+        <p className="pendant-warning" role="note"><strong>Internal prototype preview.</strong> Not for sale and not for production. Built with the preview-only profile <code>{styleInfo.profileId}</code>.</p>
+        <h1>{preset.label.replace(/ terrain pendant$/, "")} · {styleInfo.label}</h1>
+        {!allowed && <p role="alert">This preset is not enabled for internal preview.</p>}
+        {error && <p role="alert">Could not build this piece: {error}</p>}
+        <label>Style <select value={style} onChange={(e) => setStyle(e.target.value as PendantStyleId)}>{Object.values(PENDANT_STYLES).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
+        <label>Size <select value={tier} onChange={(e) => setTier(e.target.value as SizeTier)}>{SIZE_TIERS.map((t) => <option key={t} value={t}>{t[0]!.toUpperCase() + t.slice(1)}</option>)}</select></label>
+        <label>Terrain coverage <select value={coverageMode} onChange={(e) => setCoverageMode(e.target.value as typeof coverageMode)}>
+          <option value="style">Style default ({styleInfo.defaultCoverage.mode === "full" ? "full relief" : "raised land only"})</option>
+          <option value="full">Full relief</option>
+          <option value="above_level">Raised land only, flat below a level</option>
+        </select></label>
+        {coverageMode === "above_level" && <label>Level {Math.round(level * 100)}% <input type="range" min={0} max={0.8} step={0.05} value={level} onChange={(e) => setLevel(+e.target.value)} /></label>}
         <label>Place <select value={placeName} onChange={(e) => setPlaceName(e.target.value)}>{PRESET_PLACES.map((p) => <option key={p.name}>{p.name}</option>)}</select></label>
         <label>Terrain height {Math.round(terrainHeight * 100)}% <input type="range" min={0.05} max={1} step={0.05} value={terrainHeight} onChange={(e) => setTerrainHeight(+e.target.value)} /></label>
         <label>Rotation {bearingDeg}° <input type="range" min={0} max={355} step={5} value={bearingDeg} onChange={(e) => setBearingDeg(+e.target.value)} /></label>
@@ -77,20 +102,21 @@ export function PendantPreview() {
         <h2>Dimensions (generated)</h2>
         {d ? (
           <dl className="num">
-            <dt>Body</dt><dd>Ø{d.body.diameterMm} mm × {d.body.depthMm} mm deep</dd>
-            <dt>Overall, with bail</dt><dd>{d.overall.widthMm} × {d.overall.heightMm} × {d.overall.depthMm} mm (W × H × D)</dd>
-            <dt>Ground across the face</dt><dd>{(place.lengthM / 1000).toFixed(1)} km; north towards the bail</dd>
-            <dt>Estimated mass</dt><dd>{massG!.toFixed(2)} g {METALS[metal].label} (body + bail; overlap not subtracted)</dd>
+            <dt>Body</dt><dd>{d.body.widthMm} × {d.body.heightMm} mm, {d.body.depthMm} mm deep</dd>
+            <dt>Overall</dt><dd>{d.overall.widthMm} × {d.overall.heightMm} × {d.overall.depthMm} mm (W × H × D)</dd>
+            <dt>Attachment</dt><dd>{styleInfo.attachmentNote}</dd>
+            <dt>Terrain</dt><dd>{coverage?.mode === "above_level" ? `raised above ${Math.round(coverage.level * 100)}% of the relief` : "full relief"}; {(place.lengthM / 1000).toFixed(1)} km across; north at the top</dd>
+            <dt>Estimated mass</dt><dd>{massG!.toFixed(2)} g {METALS[metal].label}</dd>
           </dl>
-        ) : <p>Loading saved terrain…</p>}
+        ) : <p>Building…</p>}
 
         <h2>Preview-only values</h2>
         <table className="num"><tbody>
-          {Object.entries(PENDANT_PREVIEW_PROFILE.values).map(([k, v]) => <tr key={k}><td><code>{k}</code></td><td>{v.value} mm</td><td>{v.note}</td></tr>)}
+          {Object.entries(styleInfo.values).map(([k, v]) => <tr key={k}><td><code>{k}</code></td><td>{v.value}</td><td>{v.note}</td></tr>)}
         </tbody></table>
 
         <h2>Not decided</h2>
-        <p>The bail is a visual placeholder overlapping the rim, not a joined component. Awaiting the manufacturer: {unresolved.join(", ")}. Chain: awaiting an approved supplied chain.</p>
+        <p>The attachment is joined into one solid, but its strength and chain fit are not assessed. Awaiting the manufacturer: {Object.keys(preset.manufacturing).join(", ")}. Chain: awaiting an approved supplied chain.</p>
       </aside>
     </main>
   );

@@ -9,7 +9,7 @@ All non-ring dimensions are **proposed aesthetic presets for prototypes**, not a
 | Family | Presets | Implementation | Storefront | Prototype | Internal preview | Enquiry | Checkout | Manufacturing release |
 |---|---:|---|---|---:|---:|---:|---:|---:|
 | Ring | 6 | implemented | enquiry_only | 6 | 6 | 6 | 0 | 0 |
-| Pendant | 15 | planned, prototype | hidden | 3 | 1 | 0 | 0 | 0 |
+| Pendant | 15 | prototype, planned | hidden | 9 | 9 | 0 | 0 | 0 |
 | Charm | 12 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Stud earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Drop earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
@@ -375,15 +375,44 @@ No preset is eligible for checkout or manufacturing release: those need manufact
 
 - 185 proposed values across 11 families (body dimensions and outline choices; the ring's sizing-table version). Proposed means a candidate for comparison, not approval.
 - Preview-only values inside presets: none.
-- Preview-only profile `pendant-preview-dev-1` (for pendant-round-classic; lets the prototype render, never production):
-  - `baseThicknessMm`: 1 — Body below the terrain baseline.
-  - `maximumReliefMm`: 1.5 — Terrain at 100% height.
-  - `edgeRoundMm`: 0.3 — Front and back edge rounds.
-  - `terrainFadeMm`: 1 — Band inside the edge round over which terrain eases to the plain face.
-  - `bailOpeningHeightMm`: 3 — Integrated loop clear opening, vertical.
-  - `bailOpeningDepthMm`: 2 — Integrated loop clear opening, front to back.
-  - `bailWallMm`: 1 — Loop section diameter.
-  - `bailEmbedMm`: 0.6 — How far the loop reaches into the rim. Visual overlap only; not a joint.
+- Preview-only pendant style profiles (let the prototypes render; never production):
+  - **Circle (hidden chain channel)** — profile `pendant-circle-preview-dev-1`, for pendant-round-petite, pendant-round-classic, pendant-round-statement. The chain passes through a hidden channel across the top of the disc.
+    - `baseThicknessMm`: 2.6 — Disc thickness below the terrain baseline; holds the chain channel.
+    - `maximumReliefMm`: 1.2 — Terrain at 100% height.
+    - `edgeRoundMm`: 0.4 — Front and back edge rounds.
+    - `terrainFadeMm`: 0 — Terrain runs to the edge.
+    - `channelDiameterMm`: 1.6 — Chain channel diameter; must suit the chosen chain.
+    - `channelFromTopMm`: 2.2 — Channel centre below the top edge.
+    - `channelHeightMm`: 1.3 — Channel centre above the back.
+  - **Circle with loop** — profile `pendant-preview-dev-1`, for pendant-round-petite, pendant-round-classic, pendant-round-statement. A round-section loop above the top edge, joined to the disc.
+    - `baseThicknessMm`: 1 — Body below the terrain baseline.
+    - `maximumReliefMm`: 1.5 — Terrain at 100% height.
+    - `edgeRoundMm`: 0.3 — Front and back edge rounds.
+    - `terrainFadeMm`: 1 — Band inside the edge round over which terrain eases to the plain face.
+    - `loopOpeningHeightMm`: 3 — Integrated loop clear opening, vertical.
+    - `loopOpeningDepthMm`: 2 — Integrated loop clear opening, front to back.
+    - `loopWallMm`: 1 — Loop section diameter.
+    - `loopEmbedMm`: 0.6 — How far the loop reaches into the rim. Visual overlap only; not a joint.
+  - **Block (hidden chain channel)** — profile `pendant-block-preview-dev-1`, for pendant-tablet-petite, pendant-tablet-classic, pendant-tablet-statement. A solid block; the chain passes through a hidden channel across the top.
+    - `baseThicknessMm`: 3.6 — Block thickness below the terrain baseline; holds the chain channel.
+    - `maximumReliefMm`: 1.4 — Terrain at 100% height.
+    - `edgeRoundMm`: 0.4 — Edge rounds.
+    - `terrainFadeMm`: 0 — Terrain runs crisp to the edge.
+    - `cornerRadiusMm`: 0.6 — Plan corner radius (the catalogue's corner treatment is undecided).
+    - `channelDiameterMm`: 1.8 — Chain channel diameter; must suit the chosen chain.
+    - `channelFromTopMm`: 2.2 — Channel centre below the top edge.
+    - `channelHeightMm`: 1.8 — Channel centre above the back.
+  - **Charm (folded tab)** — profile `pendant-charm-preview-dev-1`, for pendant-cushion-petite, pendant-cushion-classic, pendant-cushion-statement. A flat strap folded over the top edge, joined to the cushion.
+    - `baseThicknessMm`: 1.6 — Body thickness below the terrain baseline.
+    - `maximumReliefMm`: 1.4 — Terrain at 100% height.
+    - `edgeRoundMm`: 0.5 — Edge rounds.
+    - `terrainFadeMm`: 0 — Terrain runs to the edge.
+    - `cornerRadiusRatio`: 0.22 — Cushion corner radius as a share of the smaller side (the catalogue's radius is undecided).
+    - `tabWidthRatio`: 0.25 — Tab width as a share of the body width.
+    - `tabThicknessMm`: 0.9 — Tab strap thickness.
+    - `tabOpeningHeightMm`: 3 — Tab clear opening, vertical.
+    - `tabOpeningDepthMm`: 2.4 — Tab clear opening, front to back.
+    - `tabEmbedMm`: 1 — How far the tab reaches into the top edge.
 
 ## Gemstone treatments (all rejected until approved)
 
