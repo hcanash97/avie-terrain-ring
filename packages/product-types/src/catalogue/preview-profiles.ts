@@ -11,7 +11,7 @@ const SOURCE = "Proposed by the coding agent; preview use approved by À Vie on 
 
 export const PENDANT_PREVIEW_PROFILE = Object.freeze({
   id: "pendant-preview-dev-1",
-  appliesTo: ["pendant-round-classic"] as readonly string[],
+  appliesTo: ["pendant-round-petite", "pendant-round-classic", "pendant-round-statement"] as readonly string[],
   values: {
     baseThicknessMm: spec.previewOnly(1.0, SOURCE, "Body below the terrain baseline."),
     maximumReliefMm: spec.previewOnly(1.5, SOURCE, "Terrain at 100% height."),
@@ -20,7 +20,7 @@ export const PENDANT_PREVIEW_PROFILE = Object.freeze({
     bailOpeningHeightMm: spec.previewOnly(3.0, SOURCE, "Integrated loop clear opening, vertical."),
     bailOpeningDepthMm: spec.previewOnly(2.0, SOURCE, "Integrated loop clear opening, front to back."),
     bailWallMm: spec.previewOnly(1.0, SOURCE, "Loop section diameter."),
-    bailEmbedMm: spec.previewOnly(0.6, SOURCE, "How far the loop reaches into the rim. Visual overlap only; not a joint."),
+    bailEmbedMm: spec.previewOnly(0.6, SOURCE, "Overlap used by the mesh union; joint strength is not assessed."),
   } satisfies Record<string, SpecValue<number>>,
 });
 

@@ -30,6 +30,8 @@ try {
   geometryVersion = `${commit}${dirty ? "-dirty" : ""}`;
 } catch { /* not a git checkout */ }
 const product = arg("product", "ring");
+if (product !== "ring" && product !== "pendant")
+  throw new Error(`Product "${product}" is not enabled for new package generation (retired and future IDs remain readable in saved records).`);
 
 if (product === "pendant") {
   const started = Date.now();
@@ -37,6 +39,8 @@ if (product === "pendant") {
   const style = arg("style", "round_slider") as PendantStyleId;
   if (!(style in PENDANT_STYLES)) throw new Error(`Unknown style "${style}". Styles: ${Object.keys(PENDANT_STYLES).join(", ")}`);
   const coverageMode = arg("coverage");
+  if (coverageMode !== undefined && coverageMode !== "full" && coverageMode !== "above_level")
+    throw new Error(`Unknown pendant coverage "${coverageMode}"`);
   const result = await buildPendantPackage({
     config: {
       presetId: `pendant-${PENDANT_STYLES[style].shape}-${arg("size", "classic")}`,

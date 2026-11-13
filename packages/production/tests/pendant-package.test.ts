@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as rhino from "../src/rhino-3dm";
 import { buildPendantPackage, PENDANT_LAYER } from "../src/pendant-package";
 import { read3dmComponents, write3dmComponents } from "../src/rhino-3dm";
 
@@ -30,6 +31,9 @@ describe("review-only pendant package", () => {
     const b = await buildPendantPackage({ config, orderRef: "TEST-P1", outDir: mkdtempSync(join(tmpdir(), "terra-pd-")), geometryVersion: "test" });
     expect(b.designHash).toBe(a.designHash);
     expect(b.meshHash).toBe(a.meshHash);
+    const manifestBefore = readFileSync(join(a.root, "02_specification/checksum-manifest.json"));
+    await expect(buildPendantPackage({ config, orderRef: "TEST-P1", outDir: a.root.slice(0, a.root.lastIndexOf("/")), geometryVersion: "test" })).rejects.toThrow(/EEXIST/);
+    expect(readFileSync(join(a.root, "02_specification/checksum-manifest.json"))).toEqual(manifestBefore);
 
     const files: string[] = [];
     const walk = (d: string) => readdirSync(d).forEach((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : files.push(join(d, f).slice(a.root.length + 1))));
@@ -63,19 +67,49 @@ describe("review-only pendant package", () => {
     expect(r.checks.holeInsideBase?.method).toMatch(/no manufacturing minimum applied/);
     expect(r.checks.attachmentStrength.status).toBe("not_run");
     expect(r.checks.minimumRimAngle.status).toBe("not_run");
-    expect(r.checks.minimumWallThickness?.status).toBe("not_run");
+    expect(r.checks.minimumWallThickness).toMatchObject({ status: "warn", execution: "completed", assessment: "unassessed" });
+    expect(r.checks.dimensions).toMatchObject({ status: "warn", assessment: "unassessed" });
+    expect(r.reopen["3dm"].matchesVolume).toBe(true);
 
     // Specification: honest about every unknown.
     const s = a.spec;
     expect(s.status).toBe("review_only");
     expect(s.claims).toMatchObject({ editableNurbs: false, castingReady: false, attachmentStrengthAssessed: false });
     expect(s.releaseBlockedBy.join(" ")).toMatch(/unapproved manufacturing requirements/);
-    for (const v of Object.values(s.previewOnlyValues)) expect(v.status).toBe("preview_only");
+    for (const v of Object.values(s.previewOnlyValues)) {
+      expect(v.status).toBe("preview_only");
+      expect(v.owner).toBe("coding_agent");
+      expect(v.source).toBeTruthy();
+      expect(v.approvedBy).toBeNull();
+    }
     for (const v of Object.values(s.manufacturingRequirements)) expect(v.value).toBeNull();
     expect(s.style).toMatchObject({ id: "tablet_slider", label: "Terrain Tablet Pendant", attachment: { kind: "through_hole" } });
     expect(s.estimatedMassG.densitySource).toMatch(/not supplied by the manufacturer/);
     expect(s.components.find((c) => c.id === "chain")).toMatchObject({ generated: false });
     expect(s.dimensions.body).toMatchObject({ widthMm: 12, heightMm: 20 });
     expect(s.coordinateSystem).toMatch(/STL files carry no units/);
+    expect(s.provenance).toMatchObject({ configurationVersion: 1, terrainAlgorithmVersion: "terrain/v1", generatorVersion: "pendant-prototype/v1" });
+    expect(s.provenance.constraintProfileHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(s.chainSpecification.chainSku).toMatchObject({ value: null, status: "awaiting_supplier" });
   }, 240000);
+
+  it("rejects unsafe output paths and unsupported materials before writing files", async () => {
+    const outDir = mkdtempSync(join(tmpdir(), "terra-pd-invalid-"));
+    await expect(buildPendantPackage({ config, orderRef: "../escape", outDir, geometryVersion: "test" })).rejects.toThrow();
+    await expect(buildPendantPackage({ config: { ...config, metal: "brass" as never }, orderRef: "TEST", outDir, geometryVersion: "test" })).rejects.toThrow();
+    expect(readdirSync(outDir)).toEqual([]);
+  });
+
+  it("records a real round-trip failure as invalid and preserves the diagnostic attempt", async () => {
+    const original = rhino.read3dmComponents;
+    const reader = vi.spyOn(rhino, "read3dmComponents").mockImplementationOnce(async (...args) => ({ ...await original(...args), units: "Meters" }));
+    try {
+      const result = await buildPendantPackage({ config, orderRef: "BAD-UNITS", outDir: mkdtempSync(join(tmpdir(), "terra-pd-held-")), geometryVersion: "test" });
+      expect(result.reopenOk).toBe(false);
+      expect(result.report).toMatchObject({ valid: false, status: "fail", errors: [{ code: "EXPORT_REIMPORT_FAILED" }] });
+      const persisted = JSON.parse(readFileSync(join(result.root, "02_specification/validation-report.json"), "utf8"));
+      expect(persisted.valid).toBe(false);
+      expect(result.spec.claims.castingReady).toBe(false);
+    } finally { reader.mockRestore(); }
+  }, 120000);
 });

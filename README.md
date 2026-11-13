@@ -40,6 +40,7 @@ Inspection: open `http://localhost:5173/#blank` for the plain clay ring with a f
 | `terrain-ring/scripts/` | Capture, look statistics, contact strips, terrain baking, artifact bundling |
 
 ## Decisions and status documents (read these first)
+- [Pendant review contracts and outstanding gates](docs/pendant-review-contracts.md): validated prototype choices, immutable review exports, provenance and the separately resolved ring-parity check. No pendant geometry or manufacturing release changes.
 - `DECISIONS.md`: product decisions by À Vie (both head shapes, five metals, all shoulder and band options, slider meaning) and open questions.
 - `MEASUREMENTS.md`: measured opening, face footprint and band sizes for every head shape, face size and finger size.
 - `LOOK.md`: approved preview look (studio, metal colours, roughness) and its acceptance numbers.

@@ -22,7 +22,7 @@ Generated from `packages/product-types/src/catalogue/pendant-styles.ts` and the 
 
 ## Terrain Cushion Pendant (`cushion_tab`)
 
-- A flat strap folded over the top edge, joined to the cushion.
+- A solid strap-shaped sweep united with the cushion; not an engineered folded-sheet assembly.
 - Expected topology: 1 shell, 1 hole through the solid. One hole: the opening of the folded tab.
 - Preview-only profile: `pendant-cushion-tab-preview-dev-1`. Default terrain: full relief.
 

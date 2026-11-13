@@ -385,7 +385,7 @@ No preset is eligible for checkout or manufacturing release: those need manufact
     - `channelDiameterMm`: 1.8 — Chain channel diameter; not yet matched to any chain.
     - `channelFromTopMm`: 2.2 — Channel centre below the top edge.
     - `channelHeightMm`: 1.8 — Channel centre above the back.
-  - **Terrain Cushion Pendant** — profile `pendant-cushion-tab-preview-dev-1`, for pendant-cushion-petite, pendant-cushion-classic, pendant-cushion-statement. A flat strap folded over the top edge, joined to the cushion.
+  - **Terrain Cushion Pendant** — profile `pendant-cushion-tab-preview-dev-1`, for pendant-cushion-petite, pendant-cushion-classic, pendant-cushion-statement. A solid strap-shaped sweep united with the cushion; not an engineered folded-sheet assembly.
     - `baseThicknessMm`: 1.6 — Body thickness below the terrain baseline.
     - `maximumReliefMm`: 1.4 — Terrain at 100% height.
     - `edgeRoundMm`: 0.5 — Edge rounds.
@@ -412,7 +412,7 @@ No preset is eligible for checkout or manufacturing release: those need manufact
     - `loopOpeningHeightMm`: 3 — Integrated loop clear opening, vertical.
     - `loopOpeningDepthMm`: 2 — Integrated loop clear opening, front to back.
     - `loopWallMm`: 1 — Loop section diameter.
-    - `loopEmbedMm`: 0.6 — How far the loop reaches into the rim. Visual overlap only; not a joint.
+    - `loopEmbedMm`: 0.6 — Overlap used by the mesh union; joint strength is not assessed.
 
 ## Gemstone treatments (all rejected until approved)
 
