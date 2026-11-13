@@ -78,21 +78,22 @@ complete local minimum around a channel or junction. Coplanar intersections,
 attachment strength and manufacturing suitability remain unresolved. Sliver
 warnings are retained, not repaired or suppressed.
 
-## Existing CI blocker: investigation, not a baseline change
+## Ring parity blocker resolved separately
 
-Main commit c4026fe fails the position hash in the 486-case ring parity suite on
-the Linux GitHub runner (run 43408112086). The first reported failing key is
-bar/slim/17.2/straight/flat/flat/low/0/0.05. The corresponding index and normal
-hashes match. The unchanged full suite passes locally on Apple Silicon under
-Node 26.5.0 and Node 24.17.0. Node version alone does not reproduce the failure.
+The historical Linux failure was isolated to near-zero inner centre-column
+coordinates. PR #12 introduced the approved, versioned positive-zero centre
+plane, retained the historical fixture and legacy generation path, and added
+exact-buffer and coordinate-delta checks on Linux x64 and macOS ARM64 under Node
+24.22.2. That correction was merged before this pendant PR.
 
-The platform/runtime contribution remains unproven. Preserve strict assertions,
-the original baseline and ring generator. A Linux reproduction and buffer-level
-comparison are still required; do not replace hashes or loosen tests to merge.
+This branch incorporates the approved correction and subsequent Cloudflare
+hosting fixes from main. Its pendant changes add no further ring geometry or
+baseline changes. Historical configuration and file preservation follow the
+version policy documented in `packages/geometry/src/products/terrain-ring/version.ts`.
 
 ## Next milestones and decisions
 
-1. Resolve the remote ring parity blocker independently, without geometry drift.
+1. Keep both platform CI checks passing against the separately approved centre-plane representation.
 2. Obtain À Vie decisions on pendant outlines, sizes, terrain edge/fade treatment,
    rear finish, visible attachment and target weight. Do not change dimensions
    globally to make a lighter product before structural assessment.
@@ -108,7 +109,7 @@ comparison are still required; do not replace hashes or loosen tests to merge.
 No paid-order automation, new product generators, NURBS, STEP, IGES, SLDPRT, USDZ,
 manufacturer contact, manufacturing release or deployment is included here.
 
-## Local verification
+## Initial pendant verification (before incorporating PR #12)
 
 - `npm run check`: typecheck and lint pass; 224 workspace tests pass, one intentional
   baseline-regeneration test skipped. Includes real STL/3DM round trips, collision
