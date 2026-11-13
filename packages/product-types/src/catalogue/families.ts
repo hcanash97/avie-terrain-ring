@@ -385,8 +385,12 @@ const tieSlides = expand({
   notes: ["Dimensions describe the visible decorative face only.", "Bespoke enquiry only at first."],
 });
 
+/** The first pendant prototype: geometry exists for review only (Milestone B). */
+const withPrototype = (ps: Preset[]) =>
+  ps.map((p) => (p.id === "pendant-round-classic" ? { ...p, status: { ...p.status, implementation: "prototype" as const } } : p));
+
 export const familyPresets: Preset[] = [
-  ...pendants,
+  ...withPrototype(pendants),
   ...charms,
   ...studs,
   ...drops,

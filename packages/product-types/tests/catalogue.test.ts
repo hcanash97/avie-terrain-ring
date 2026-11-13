@@ -132,9 +132,10 @@ describe("availability is explicit and gated", () => {
     }
   });
 
-  it("keeps the ring enquiry-only and pendants at prototype only", () => {
+  it("keeps the ring enquiry-only and the other round pendants at prototype only", () => {
     expect(availabilityOf(getPreset("ring-bar-standard")).allowed).toEqual({ prototype: true, internalPreview: true, customerEnquiry: true, checkout: false, manufacturingRelease: false });
-    expect(availabilityOf(getPreset("pendant-round-classic")).allowed).toEqual({ prototype: true, internalPreview: false, customerEnquiry: false, checkout: false, manufacturingRelease: false });
+    // The 18 mm round (Milestone B) is the only pendant with internal preview; see "pendant preview profile".
+    expect(availabilityOf(getPreset("pendant-round-petite")).allowed).toEqual({ prototype: true, internalPreview: false, customerEnquiry: false, checkout: false, manufacturingRelease: false });
   });
 
   it("maps no preset to a retired product", () => {
@@ -153,5 +154,17 @@ describe("unresolved-decisions report", () => {
   it("matches the committed file (regenerate with npm run catalogue:report)", () => {
     const committed = readFileSync(resolve(import.meta.dirname, "../../../docs/catalogue-unresolved-decisions.md"), "utf8");
     expect(committed).toBe(renderUnresolvedDecisions(CATALOGUE));
+  });
+});
+
+describe("pendant preview profile", () => {
+  it("is preview-only and does not unlock enquiry, checkout or release", async () => {
+    const { PENDANT_PREVIEW_PROFILE, pendantPreviewNumbers } = await import("../src/index");
+    for (const v of Object.values(PENDANT_PREVIEW_PROFILE.values)) expect(v.status).toBe("preview_only");
+    expect(pendantPreviewNumbers().baseThicknessMm).toBe(1);
+    const p = getPreset("pendant-round-classic");
+    expect(p.status.implementation).toBe("prototype");
+    expect(availabilityOf(p).allowed).toEqual({ prototype: true, internalPreview: true, customerEnquiry: false, checkout: false, manufacturingRelease: false });
+    for (const v of Object.values(p.manufacturing)) expect(v.value).toBeNull();
   });
 });

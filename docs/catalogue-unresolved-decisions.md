@@ -9,7 +9,7 @@ All non-ring dimensions are **proposed aesthetic presets for prototypes**, not a
 | Family | Presets | Implementation | Storefront | Prototype | Internal preview | Enquiry | Checkout | Manufacturing release |
 |---|---:|---|---|---:|---:|---:|---:|---:|
 | Ring | 6 | implemented | enquiry_only | 6 | 6 | 6 | 0 | 0 |
-| Pendant | 15 | planned | hidden | 3 | 0 | 0 | 0 | 0 |
+| Pendant | 15 | planned, prototype | hidden | 3 | 1 | 0 | 0 | 0 |
 | Charm | 12 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Stud earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
 | Drop earrings | 9 | planned | hidden | 0 | 0 | 0 | 0 | 0 |
@@ -374,7 +374,16 @@ No preset is eligible for checkout or manufacturing release: those need manufact
 ## Proposed and preview-only values
 
 - 185 proposed values across 11 families (body dimensions and outline choices; the ring's sizing-table version). Proposed means a candidate for comparison, not approval.
-- Preview-only values: none yet (the pendant preview profile arrives with Milestone B).
+- Preview-only values inside presets: none.
+- Preview-only profile `pendant-preview-dev-1` (for pendant-round-classic; lets the prototype render, never production):
+  - `baseThicknessMm`: 1 — Body below the terrain baseline.
+  - `maximumReliefMm`: 1.5 — Terrain at 100% height.
+  - `edgeRoundMm`: 0.3 — Front and back edge rounds.
+  - `terrainFadeMm`: 1 — Band inside the edge round over which terrain eases to the plain face.
+  - `bailOpeningHeightMm`: 3 — Integrated loop clear opening, vertical.
+  - `bailOpeningDepthMm`: 2 — Integrated loop clear opening, front to back.
+  - `bailWallMm`: 1 — Loop section diameter.
+  - `bailEmbedMm`: 0.6 — How far the loop reaches into the rim. Visual overlap only; not a joint.
 
 ## Gemstone treatments (all rejected until approved)
 
@@ -403,7 +412,7 @@ Signet heads are treated as future ring styles rather than a separate family; th
 
 - Outline generators (circle, ellipse, rounded rectangle, tablet, across-flats hexagon) and tessellation density, with dimensional-error tests.
 - Landscape crop and mask for non-rectangular bodies: crop to the body's own aspect and mask; never stretch.
-- Coordinate convention for flat products: origin at the body centre on the back plane; +Y relief, +Z towards the attachment, +X right (see `catalogue/types.ts`).
+- Coordinate convention for flat products (right-handed, lying face-up): origin at the body centre on the back plane; +Y relief, +X right, attachment towards −Z; terrain north towards the attachment (see `catalogue/types.ts`).
 - Preview-only edge radii and attachment proportions, listed as preview-only and blocked from release.
 
 ## Known conflicts to resolve

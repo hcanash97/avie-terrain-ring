@@ -10,13 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@avie/geometry": "file:../packages/geometry",
+    "@avie/product-types": "file:../packages/product-types",
+    "@avie/terrain": "file:../packages/terrain",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.169.0",
-    "zustand": "^4.5.5",
-    "@avie/terrain": "file:../packages/terrain",
-    "@avie/geometry": "file:../packages/geometry"
+    "zustand": "^4.5.5"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",
