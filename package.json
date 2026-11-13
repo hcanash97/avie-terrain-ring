@@ -6,6 +6,8 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build:site",
+    "build:site": "npm ci --include=dev && npm --prefix terrain-ring ci --include=dev && npm --prefix terrain-ring run build",
     "test": "vitest run",
     "test:all": "npm test && npm --prefix terrain-ring test",
     "typecheck": "tsc --noEmit",
@@ -31,7 +33,8 @@
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "4.161.0"
   },
   "overrides": {
     "@typescript-eslint/typescript-estree": {
@@ -43,5 +46,6 @@
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
-  }
+  },
+  "packageManager": "npm@10.9.9"
 }
