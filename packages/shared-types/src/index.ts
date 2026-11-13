@@ -5,3 +5,4 @@ export * from "./configuration";
 export * from "./validation";
 export * from "./artefact";
 export * from "./spec";
+export * from "./pendant-prototype";

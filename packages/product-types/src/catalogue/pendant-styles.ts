@@ -8,7 +8,7 @@
  * Every number here is preview_only: it lets the prototype render and be
  * reviewed, and it can never make a preset eligible for production.
  */
-import { spec, type SpecValue } from "@avie/shared-types";
+import { spec, pendantCoverageSchema, pendantPrototypeSelectionSchema, type PendantStyleId, type SpecValue } from "@avie/shared-types";
 import type { PendantParameters, TerrainCoverage } from "@avie/geometry/terrain-pendant";
 import { getPreset } from "./index";
 import { PENDANT_PREVIEW_PROFILE } from "./preview-profiles";
@@ -16,7 +16,7 @@ import { PENDANT_PREVIEW_PROFILE } from "./preview-profiles";
 const SOURCE = "Proposed by the coding agent for the style prototypes, 13 Nov 2026 (preview only, not a manufacturing value)";
 const pv = (value: number, note: string) => spec.previewOnly(value, SOURCE, note);
 
-export type PendantStyleId = "tablet_slider" | "cushion_tab" | "round_slider" | "round_loop";
+export type { PendantStyleId } from "@avie/shared-types";
 
 export type PendantStyle = {
   id: PendantStyleId;
@@ -70,7 +70,7 @@ export const PENDANT_STYLES: Record<PendantStyleId, PendantStyle> = {
     expectedTopology: { shells: 1, genus: 1, note: "One hole: the opening of the folded tab." },
     shape: "cushion",
     attachment: "tab",
-    attachmentNote: "A flat strap folded over the top edge, joined to the cushion.",
+    attachmentNote: "A solid strap-shaped sweep united with the cushion; not an engineered folded-sheet assembly.",
     defaultCoverage: { mode: "full" },
     values: {
       baseThicknessMm: pv(1.6, "Body thickness below the terrain baseline."),
@@ -163,14 +163,24 @@ export const styleAppliesTo = (style: PendantStyleId) => {
   return ["petite", "classic", "statement"].map((tier) => `pendant-${shape}-${tier}`);
 };
 
+/** Authoritative prototype capability resolution; does not enable sale or release. */
+export function resolvePendantPrototype(input: unknown) {
+  const selection = pendantPrototypeSelectionSchema.parse(input);
+  if (!styleAppliesTo(selection.style).includes(selection.presetId))
+    throw new Error(`Unsupported pendant style/preset: ${selection.style}/${selection.presetId}; the ${selection.style} style needs a ${PENDANT_STYLES[selection.style].shape}`);
+  const preset = getPreset(selection.presetId);
+  if (preset.productId !== "terrain_pendant" || preset.status.implementation !== "prototype")
+    throw new Error("Preset is not an implemented pendant prototype");
+  return { selection, preset, style: PENDANT_STYLES[selection.style], geometryVersion: "pendant-prototype/v1", manufacturingRelease: false as const };
+}
+
 /**
  * Generator parameters for a preset in a style. Body width and height come
  * from the catalogue (proposed); everything else from the style's preview-only
  * values. The terrain is supplied by the caller.
  */
 export function pendantStyleParameters(presetId: string, styleId: PendantStyleId, coverage?: TerrainCoverage): Omit<PendantParameters, "terrain" | "resolution"> & { maximumReliefMm: number; profileId: string } {
-  const style = PENDANT_STYLES[styleId];
-  const preset = getPreset(presetId);
+  const { style, preset } = resolvePendantPrototype({ productType: "terrain_pendant", contractVersion: 1, configurationVersion: 1, presetId, style: styleId });
   const o = preset.outline;
   if (o.shape !== style.shape) throw new Error(`${presetId} is a ${o.shape}; the ${style.id} style needs a ${style.shape}`);
   const width = o.shape === "round" ? o.diameterMm.value : o.shape === "tablet" || o.shape === "cushion" ? o.widthMm.value : null;
@@ -197,7 +207,7 @@ export function pendantStyleParameters(presetId: string, styleId: PendantStyleId
     baseThicknessMm: n(style, "baseThicknessMm"),
     edgeRoundMm: n(style, "edgeRoundMm"),
     fadeMm: n(style, "terrainFadeMm"),
-    coverage: coverage ?? style.defaultCoverage,
+    coverage: pendantCoverageSchema.parse(coverage ?? style.defaultCoverage),
     attachment,
     maximumReliefMm: n(style, "maximumReliefMm"),
   };

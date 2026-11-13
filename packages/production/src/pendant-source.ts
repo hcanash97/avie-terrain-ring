@@ -5,12 +5,14 @@
  * other dimensions from the style's preview-only profile, so the result can
  * never be more than review-only.
  */
-import { buildTerrain, frameFor, sampleFrame, type Detail } from "@avie/terrain";
+import { buildTerrain, frameFor, sampleFrame } from "@avie/terrain";
+import { pendantPrototypeConfigurationSchema } from "@avie/shared-types";
+import type { z } from "zod";
 import { METAL_DENSITY_G_CM3 } from "@avie/geometry/terrain-ring";
-import { createPendant, type TerrainCoverage } from "@avie/geometry/terrain-pendant";
-import { getPreset, PENDANT_STYLES, pendantStyleParameters, type PendantStyleId } from "@avie/product-types";
+import { createPendant } from "@avie/geometry/terrain-pendant";
+import { resolvePendantPrototype, pendantStyleParameters } from "@avie/product-types";
 import type { IndexedMesh } from "./mesh";
-import { loadSavedTerrain, type Metal } from "./ring-source";
+import { loadSavedTerrain } from "./ring-source";
 
 export const PENDANT_PRODUCTION_RESOLUTION = { cols: 480, rings: 150, angular: 480, round: 8, attachmentSegments: 96 } as const;
 const PRESET_LENGTH_M: Record<string, number> = {
@@ -18,23 +20,13 @@ const PRESET_LENGTH_M: Record<string, number> = {
   "Mount Fuji, JP": 20000, "Grand Canyon, US": 16000, "Lake District, GB": 18000
 };
 
-export type PendantConfiguration = {
-  presetId?: string; // default: the 18 mm round
-  style?: PendantStyleId; // default: the Terrain Medallion (round_slider)
-  coverage?: TerrainCoverage; // default: the style's (full relief)
-  place: string;
-  lengthM?: number; // ground distance across the body width; defaults to the place's preset
-  bearingDeg: number;
-  terrainHeight: number;
-  detail: Detail;
-  metal: Metal;
-  finish: "polished" | "satin";
-};
+export type PendantConfiguration = z.input<typeof pendantPrototypeConfigurationSchema>;
 
-export async function buildProductionPendant(config: PendantConfiguration) {
-  const presetId = config.presetId ?? "pendant-round-classic";
-  const styleId = config.style ?? "round_slider";
-  const preset = getPreset(presetId);
+export async function buildProductionPendant(input: PendantConfiguration) {
+  const config = pendantPrototypeConfigurationSchema.parse(input);
+  const { presetId, style: styleId } = config;
+  const capability = resolvePendantPrototype({ productType: "terrain_pendant", contractVersion: 1, configurationVersion: config.configurationVersion, presetId, style: styleId });
+  const preset = capability.preset;
   const params = pendantStyleParameters(presetId, styleId, config.coverage);
   const lengthM = config.lengthM ?? PRESET_LENGTH_M[config.place] ?? 6000;
   const dims = { faceLengthMm: params.outline.widthMm, faceWidthMm: params.outline.heightMm, maxReliefMm: params.maximumReliefMm };
@@ -46,7 +38,10 @@ export async function buildProductionPendant(config: PendantConfiguration) {
   const mesh: IndexedMesh = { positions: built.mesh.positions, indices: built.mesh.indices, surfaceLabels: built.mesh.surfaceLabels };
   return {
     preset,
-    style: PENDANT_STYLES[styleId],
+    config,
+    selection: capability.selection,
+    generatorVersion: capability.geometryVersion,
+    style: capability.style,
     params,
     lengthM,
     area,

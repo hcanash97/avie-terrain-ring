@@ -10,10 +10,12 @@
     "package": "npx tsx src/cli.ts"
   },
   "dependencies": {
+    "@avie/shared-types": "*",
     "@avie/geometry": "*",
     "@avie/terrain": "*",
     "pngjs": "7.0.0",
     "rhino3dm": "8.17.0",
-    "@avie/product-types": "*"
+    "@avie/product-types": "*",
+    "zod": "^4.6.7"
   }
 }

@@ -12,7 +12,10 @@
  * from a preview-only style profile, joint strength and chain fit are not
  * assessed, and no manufacturing requirement is approved.
  */
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { z } from "zod";
+import { unknownPendantChainSpecification } from "@avie/shared-types";
+import { TERRAIN_ALGORITHM_VERSION } from "@avie/terrain";
 import { join, relative } from "node:path";
 import { validation } from "@avie/geometry";
 import { attachmentDiagnostics } from "@avie/geometry/terrain-pendant";
@@ -24,6 +27,7 @@ import { buildProductionPendant, PENDANT_PRODUCTION_RESOLUTION, type PendantConf
 import { read3dmComponents, REPRESENTATION_NOTE, write3dmComponents } from "./rhino-3dm";
 import { loadSavedTerrain } from "./ring-source";
 import { readBinaryStl, writeBinaryStl } from "./stl";
+import { pendantReviewChecks, pendantReviewOutcome, type PendantReviewCheck } from "./pendant-review-report";
 
 export const PENDANT_LAYER = "Terra pendant";
 
@@ -36,8 +40,22 @@ export type PendantPackageOptions = {
 };
 
 export async function buildPendantPackage(opts: PendantPackageOptions) {
-  const { config } = opts;
-  const pd = await buildProductionPendant(config);
+  // Order references become path segments: never allow separators or traversal.
+  const orderRef = z.string().min(1).max(80).regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/).parse(opts.orderRef);
+  z.string().trim().min(1).max(200).parse(opts.geometryVersion);
+  const pd = await buildProductionPendant(opts.config);
+  const { config } = pd;
+  const saved = loadSavedTerrain(config.place);
+  const provenance = {
+    contractVersion: pd.selection.contractVersion,
+    configurationVersion: config.configurationVersion,
+    generatorVersion: pd.generatorVersion,
+    terrainAlgorithmVersion: TERRAIN_ALGORITHM_VERSION,
+    previewProfile: pd.params.profileId,
+    // Hash actual provisional data; an unchanged profile name cannot mask edits.
+    constraintProfileHash: sha256(canonical({ outline: pd.preset.outline, values: pd.style.values, manufacturing: pd.preset.manufacturing })),
+    savedSourceSha256: sha256(saved.png),
+  };
   const designParameters = {
     productType: "terrain_pendant",
     presetId: pd.preset.id,
@@ -48,12 +66,15 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     material: { metal: config.metal, finish: config.finish, densityGcm3: pd.densityGcm3 },
     resolution: PENDANT_PRODUCTION_RESOLUTION,
     geometryVersion: opts.geometryVersion,
+    provenance,
   };
   const heightmapBytes = new Uint8Array(pd.elevations.data.buffer.slice(0));
   const designHash = sha256(canonical(designParameters) + sha256(heightmapBytes));
   const designRef = `PD-${designHash.slice(0, 7).toUpperCase()}`;
-  const root = join(opts.outDir, `ORDER-${opts.orderRef}_${designRef}`);
-  if (existsSync(root)) rmSync(root, { recursive: true });
+  const root = join(opts.outDir, `ORDER-${orderRef}_${designRef}`);
+  mkdirSync(opts.outDir, { recursive: true });
+  // Atomic exclusive creation. Never delete a previous or failed review attempt.
+  mkdirSync(root);
   const dir = (p: string) => { mkdirSync(join(root, p), { recursive: true }); return join(root, p); };
   const cad = dir("01_cad"), spec = dir("02_specification"), visuals = dir("03_visuals"), src = dir("04_source");
 
@@ -64,6 +85,7 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     designRef, designHash, orderRef: opts.orderRef, productType: "terrain_pendant", presetId: pd.preset.id, style: pd.style.id,
     previewProfile: pd.params.profileId, geometryVersion: opts.geometryVersion, packageFormat: PACKAGE_FORMAT_VERSION,
     status: "review_only", attachment: pd.params.attachment.kind, meshSha256OfStl: meshHash,
+    provenance: canonical(provenance),
   };
   const dm = await write3dmComponents([{ mesh: pd.mesh, layer: PENDANT_LAYER, name: `Terra pendant ${designRef}`, metadata: { component: "pendant", attachment: pd.params.attachment.kind } }], documentMeta);
   writeFileSync(join(cad, "terrain-pendant.stl"), stlBytes);
@@ -101,6 +123,7 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
       matchesTriangleCount: obj?.triangleCount === pd.mesh.indices.length / 3,
       matchesVertexCount: obj?.vertexCount === pd.mesh.positions.length / 3,
       matchesBoundingBox: obj ? near(obj.bbox.min, box.min, 1e-4) && near(obj.bbox.max, box.max, 1e-4) : false,
+      matchesVolume: obj?.mesh ? Math.abs(signedVolume(obj.mesh) - volume) <= Math.abs(volume) * 1e-6 : false,
       metadataIntact: Object.entries(documentMeta).every(([k, v]) => dmBack.documentStrings[k] === v),
     },
   };
@@ -129,7 +152,9 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
       note: expected.note,
     },
     attachmentDiagnostics: {
-      status: "not_run" as const,
+      status: "warn" as const,
+      execution: "completed" as const,
+      assessment: "unassessed" as const,
       method: "measurements for the manufacturer; nothing is judged against a minimum",
       measured: attachmentDiagnostics(pd.mesh, pd.params.outline, pd.params.baseThicknessMm, pd.params.attachment) as unknown as Record<string, number>,
       note: "Chain fit is not assessed: no chain has been chosen.",
@@ -137,18 +162,17 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     attachmentStrength: { status: "not_run" as const, method: "none", note: "Joint strength, chain fit and wear are not assessed; they need the manufacturer and the chosen chain." },
     minimumRimAngle: { status: "not_run" as const, method: "not implemented for pendant outlines", note: "The ring's rim check covers straight long sides of a rectangular face; a perimeter-wide version for pendants is planned." },
   };
-  const valid = solidReport.valid && Object.values(attachmentChecks).every((c) => c.status === "pass") && extra.topology.status === "pass";
+  const geometryValid = solidReport.valid && Object.values(attachmentChecks).every((c) => c.status === "pass") && extra.topology.status === "pass";
   const availability = availabilityOf(pd.preset);
   const validationReport = {
     ...solidReport,
-    valid,
-    status: valid ? "held_for_review" : "fail",
-    checks: { ...solidReport.checks, ...extra } as Record<string, validation.Check> & typeof extra,
+    ...pendantReviewOutcome(geometryValid, reopenOk, solidReport.errors),
+    checks: { ...pendantReviewChecks(solidReport.checks), ...extra } as Record<string, PendantReviewCheck | validation.Check> & typeof extra,
     reopen,
     reopenPassed: reopenOk,
     limitations: [
       "Body and attachment are one solid, joined by exact mesh booleans (seams cleaned within 0.0001 mm). Joint strength is not assessed.",
-      "Structural wall includes the metal around the chain channel, where present; it is reported, not judged.",
+      "Structural wall rays include only samples that start or end on the back; they do not establish the complete channel or junction minimum. Nominal channel walls and selected attachment slices are reported separately, not judged.",
       "Dimensions come from a preview-only style profile; no manufacturing requirement is approved, so nothing is judged against a minimum.",
       "Feature size is measured by the sphere method on terrain triangles and reported only.",
       "No check here establishes casting suitability; that requires the manufacturer's approved requirements and a physical sample.",
@@ -157,7 +181,6 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   writeFileSync(join(spec, "validation-report.json"), JSON.stringify(validationReport, null, 2));
 
   // --- Source ----------------------------------------------------------------
-  const saved = loadSavedTerrain(config.place);
   writeFileSync(join(src, "design-parameters.json"), JSON.stringify({ ...designParameters, designHash, designRef }, null, 2));
   writeFileSync(join(src, "heightmap.bin"), heightmapBytes);
   writeFileSync(join(src, "heightmap-metadata.json"), JSON.stringify({
@@ -167,6 +190,7 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     crop: "frame of the body's own width and height, masked to its outline (cropped, not stretched)",
     groundLengthM: pd.lengthM, groundWidthM: pd.area.widthM, bearingDeg: config.bearingDeg,
     savedSource: { place: config.place, id: saved.meta.id, sha256: sha256(saved.png) },
+    terrainAlgorithmVersion: TERRAIN_ALGORITHM_VERSION,
     sha256: sha256(heightmapBytes),
   }, null, 2));
 
@@ -187,6 +211,7 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     orderRef: opts.orderRef,
     designRef,
     designHash,
+    provenance,
     product: `À Vie Terra Pendant, ${pd.style.label} (prototype)`,
     productType: "terrain_pendant",
     presetId: pd.preset.id,
@@ -197,8 +222,9 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     dimensions: { body: { ...d.body, terrainReliefMm: +reliefMm.toFixed(3) }, overall: { ...d.overall, note: "Including the attachment." } },
     terrainCoverage: pd.params.coverage,
     estimatedMassG: { value: +((d.volumeMm3 / 1000) * pd.densityGcm3).toFixed(2), metal: config.metal, densityGcm3: pd.densityGcm3, densitySource: METAL_DENSITY_SOURCE },
-    previewOnlyValues: Object.fromEntries(Object.entries(pd.style.values).map(([k, v]) => [k, { value: v.value, status: v.status, note: v.note }])),
-    manufacturingRequirements: Object.fromEntries(Object.entries(pd.preset.manufacturing).map(([k, v]) => [k, { value: v.value, status: v.status, owner: v.owner, note: v.note }])),
+    previewOnlyValues: pd.style.values,
+    manufacturingRequirements: pd.preset.manufacturing,
+    chainSpecification: unknownPendantChainSpecification(),
     components: [
       { id: "pendant", generated: true, attachmentIncluded: pd.params.attachment.kind, files: ["01_cad/terrain-pendant.stl", `01_cad/terrain-pendant.3dm (layer "${PENDANT_LAYER}")`] },
       { id: "chain", generated: false, supplied: true, status: "awaiting an approved supplied chain; not part of the cast pendant" },
