@@ -24,11 +24,13 @@ export const ENABLED_PRESETS: Readonly<Record<string, Partial<Availability>>> = 
   "ring-cushion-slim": { prototype: true, internalPreview: true, customerEnquiry: true },
   "ring-cushion-standard": { prototype: true, internalPreview: true, customerEnquiry: true },
   "ring-cushion-bold": { prototype: true, internalPreview: true, customerEnquiry: true },
-  // First pendant prototype: internal preview of the 18 mm round only, using the
-  // preview-only profile. Petite and statement stay prototype-only.
-  "pendant-round-petite": { prototype: true },
-  "pendant-round-classic": { prototype: true, internalPreview: true },
-  "pendant-round-statement": { prototype: true },
+  // Pendant style prototypes (circle, block, charm) in every size: internal
+  // preview only, built with preview-only style profiles.
+  ...Object.fromEntries(
+    ["round", "tablet", "cushion"].flatMap((shape) =>
+      ["petite", "classic", "statement"].map((tier) => [`pendant-${shape}-${tier}`, { prototype: true, internalPreview: true }]),
+    ),
+  ),
 });
 
 /** Why a requested use is not allowed; empty when allowed. */

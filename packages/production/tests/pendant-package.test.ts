@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BAIL_LAYER, BODY_LAYER, buildPendantPackage } from "../src/pendant-package";
+import { buildPendantPackage, PENDANT_LAYER } from "../src/pendant-package";
 import { read3dmComponents, write3dmComponents } from "../src/rhino-3dm";
 
 const tetra = { positions: new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10]), indices: new Uint32Array([0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3]) };
@@ -23,51 +23,52 @@ describe("multi-component 3DM", () => {
 });
 
 describe("review-only pendant package", () => {
-  const config = { place: "Snowdon, GB", bearingDeg: 0, terrainHeight: 0.7, detail: "high" as const, metal: "gold_9ct" as const, finish: "polished" as const };
+  const config = { presetId: "pendant-tablet-classic", style: "block" as const, place: "Snowdon, GB", bearingDeg: 0, terrainHeight: 0.7, detail: "high" as const, metal: "silver_925" as const, finish: "polished" as const };
 
-  it("writes separate components, reopens them, hashes every file and stays review-only", async () => {
+  it("writes one joined solid, reopens it, hashes every file and stays review-only", async () => {
     const a = await buildPendantPackage({ config, orderRef: "TEST-P1", outDir: mkdtempSync(join(tmpdir(), "terra-pd-")), geometryVersion: "test" });
     const b = await buildPendantPackage({ config, orderRef: "TEST-P1", outDir: mkdtempSync(join(tmpdir(), "terra-pd-")), geometryVersion: "test" });
     expect(b.designHash).toBe(a.designHash);
-    expect(b.meshHashes).toEqual(a.meshHashes);
+    expect(b.meshHash).toBe(a.meshHash);
 
     const files: string[] = [];
     const walk = (d: string) => readdirSync(d).forEach((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : files.push(join(d, f).slice(a.root.length + 1))));
     walk(a.root);
     expect(files.sort()).toEqual([
-      "01_cad/terrain-pendant-bail.stl", "01_cad/terrain-pendant-body.stl", "01_cad/terrain-pendant.3dm",
+      "01_cad/terrain-pendant.3dm", "01_cad/terrain-pendant.stl",
       "02_specification/checksum-manifest.json", "02_specification/production-spec.json", "02_specification/validation-report.json",
       "04_source/design-parameters.json", "04_source/heightmap-metadata.json", "04_source/heightmap.bin",
     ]);
     const manifest = JSON.parse(readFileSync(join(a.root, "02_specification/checksum-manifest.json"), "utf8"));
     for (const f of manifest.files) expect(createHash("sha256").update(readFileSync(join(a.root, f.path))).digest("hex"), f.path).toBe(f.sha256);
 
-    // Both CAD formats reproduce each component; the 3DM holds two objects on their own layers.
+    // Both CAD formats reproduce the one solid.
     expect(a.reopenOk).toBe(true);
-    const dm = await read3dmComponents(readFileSync(join(a.root, "01_cad/terrain-pendant.3dm")), ["component"], ["status"]);
-    expect(dm.objects.map((o) => o.layerName)).toEqual([BODY_LAYER, BAIL_LAYER]);
-    expect(dm.documentStrings.status).toBe("review_only");
+    const dm = await read3dmComponents(readFileSync(join(a.root, "01_cad/terrain-pendant.3dm")), ["component"], ["status", "style"]);
+    expect(dm.objects.map((o) => o.layerName)).toEqual([PENDANT_LAYER]);
+    expect(dm.documentStrings).toMatchObject({ status: "review_only", style: "block" });
 
-    // Validation: both components sound, and what is not assessed is never a pass.
-    expect(a.report.components.body.errors).toEqual([]);
-    expect(a.report.components.bail.errors).toEqual([]);
-    expect(a.report.status).toBe("held_for_review");
-    expect(a.report.checks.componentJoin.status).toBe("not_run");
-    expect(a.report.checks.minimumRimAngle.status).toBe("not_run");
-    expect(a.report.components.body.checks.minimumWallThickness!.status).toBe("not_run");
-    expect(a.report.components.body.checks.minimumFeatureSize!.status).toBe("not_run");
+    // Validation: sound solid with its channel; what is not assessed is never a pass.
+    const r = a.report;
+    expect(r.errors).toEqual([]);
+    expect(r.status).toBe("held_for_review");
+    expect(r.checks.genus).toMatchObject({ status: "pass", measured: 1 });
+    expect(r.checks.holeBelowTopEdge?.status).toBe("pass");
+    expect(r.checks.holeInsideBase?.method).toMatch(/no manufacturing minimum applied/);
+    expect(r.checks.attachmentStrength.status).toBe("not_run");
+    expect(r.checks.minimumRimAngle.status).toBe("not_run");
+    expect(r.checks.minimumWallThickness?.status).toBe("not_run");
 
     // Specification: honest about every unknown.
     const s = a.spec;
     expect(s.status).toBe("review_only");
-    expect(s.claims).toMatchObject({ editableNurbs: false, castingReady: false, joinedBail: false });
+    expect(s.claims).toMatchObject({ editableNurbs: false, castingReady: false, attachmentStrengthAssessed: false });
     expect(s.releaseBlockedBy.join(" ")).toMatch(/unapproved manufacturing requirements/);
     for (const v of Object.values(s.previewOnlyValues)) expect(v.status).toBe("preview_only");
     for (const v of Object.values(s.manufacturingRequirements)) expect(v.value).toBeNull();
-    expect(s.components.find((c) => c.id === "bail")).toMatchObject({ visualPlaceholder: true, joinedToBody: false });
+    expect(s.style).toMatchObject({ id: "block", attachment: { kind: "through_hole" } });
     expect(s.components.find((c) => c.id === "chain")).toMatchObject({ generated: false });
-    expect(s.notGenerated.join(" ")).toMatch(/joined body-and-bail solid/);
-    expect(s.dimensions.body.diameterMm).toBeCloseTo(18, 6);
+    expect(s.dimensions.body).toMatchObject({ widthMm: 12, heightMm: 20 });
     expect(s.coordinateSystem).toMatch(/STL files carry no units/);
-  }, 180000);
+  }, 240000);
 });

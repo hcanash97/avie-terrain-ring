@@ -5,7 +5,7 @@
 import type { SpecOwner, SpecValue } from "@avie/shared-types";
 import { availabilityOf, type Availability } from "./availability";
 import { GEMSTONE_REQUIREMENTS, GEMSTONE_TREATMENTS } from "./gemstones";
-import { PENDANT_PREVIEW_PROFILE } from "./preview-profiles";
+import { PENDANT_STYLES, styleAppliesTo } from "./pendant-styles";
 import { RING_STYLES } from "./ring";
 import type { Family, Preset } from "./types";
 
@@ -96,8 +96,11 @@ export function renderUnresolvedDecisions(catalogue: readonly Preset[]): string 
     "",
     `- ${proposed.length} proposed values across ${new Set(proposed).size} families (body dimensions and outline choices; the ring's sizing-table version). Proposed means a candidate for comparison, not approval.`,
     `- Preview-only values inside presets: ${previewOnly.length ? previewOnly.join("; ") : "none"}.`,
-    `- Preview-only profile \`${PENDANT_PREVIEW_PROFILE.id}\` (for ${PENDANT_PREVIEW_PROFILE.appliesTo.join(", ")}; lets the prototype render, never production):`,
-    ...Object.entries(PENDANT_PREVIEW_PROFILE.values).map(([k, v]) => `  - \`${k}\`: ${v.value} — ${v.note}`),
+    "- Preview-only pendant style profiles (let the prototypes render; never production):",
+    ...Object.values(PENDANT_STYLES).flatMap((s) => [
+      `  - **${s.label}** — profile \`${s.profileId}\`, for ${styleAppliesTo(s.id).join(", ")}. ${s.attachmentNote}`,
+      ...Object.entries(s.values).map(([k, v]) => `    - \`${k}\`: ${v.value} — ${v.note}`),
+    ]),
     "",
     "## Gemstone treatments (all rejected until approved)",
     "",

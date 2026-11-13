@@ -385,9 +385,10 @@ const tieSlides = expand({
   notes: ["Dimensions describe the visible decorative face only.", "Bespoke enquiry only at first."],
 });
 
-/** The first pendant prototype: geometry exists for review only (Milestone B). */
+/** Pendant prototypes: round, tablet and cushion in every size tier have review-only geometry. */
+const PROTOTYPE_SHAPES = ["round", "tablet", "cushion"];
 const withPrototype = (ps: Preset[]) =>
-  ps.map((p) => (p.id === "pendant-round-classic" ? { ...p, status: { ...p.status, implementation: "prototype" as const } } : p));
+  ps.map((p) => (PROTOTYPE_SHAPES.some((s) => p.id.startsWith(`pendant-${s}-`)) ? { ...p, status: { ...p.status, implementation: "prototype" as const } } : p));
 
 export const familyPresets: Preset[] = [
   ...withPrototype(pendants),

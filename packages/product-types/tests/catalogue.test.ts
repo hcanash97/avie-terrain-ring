@@ -132,10 +132,12 @@ describe("availability is explicit and gated", () => {
     }
   });
 
-  it("keeps the ring enquiry-only and the other round pendants at prototype only", () => {
+  it("keeps the ring enquiry-only and the pendant style prototypes at internal preview", () => {
     expect(availabilityOf(getPreset("ring-bar-standard")).allowed).toEqual({ prototype: true, internalPreview: true, customerEnquiry: true, checkout: false, manufacturingRelease: false });
-    // The 18 mm round (Milestone B) is the only pendant with internal preview; see "pendant preview profile".
-    expect(availabilityOf(getPreset("pendant-round-petite")).allowed).toEqual({ prototype: true, internalPreview: false, customerEnquiry: false, checkout: false, manufacturingRelease: false });
+    for (const shape of ["round", "tablet", "cushion"]) for (const tier of ["petite", "classic", "statement"])
+      expect(availabilityOf(getPreset(`pendant-${shape}-${tier}`)).allowed).toEqual({ prototype: true, internalPreview: true, customerEnquiry: false, checkout: false, manufacturingRelease: false });
+    // Shapes without a style stay unbuilt.
+    expect(availabilityOf(getPreset("pendant-oval-classic")).allowed.internalPreview).toBe(false);
   });
 
   it("maps no preset to a retired product", () => {
@@ -166,5 +168,25 @@ describe("pendant preview profile", () => {
     expect(p.status.implementation).toBe("prototype");
     expect(availabilityOf(p).allowed).toEqual({ prototype: true, internalPreview: true, customerEnquiry: false, checkout: false, manufacturingRelease: false });
     for (const v of Object.values(p.manufacturing)) expect(v.value).toBeNull();
+  });
+});
+
+describe("pendant styles", () => {
+  it("build only from proposed catalogue sizes and preview-only style values", async () => {
+    const { PENDANT_STYLES, pendantStyleParameters, styleAppliesTo } = await import("../src/index");
+    for (const style of Object.values(PENDANT_STYLES)) {
+      for (const v of Object.values(style.values)) expect(v.status, `${style.id}`).toBe("preview_only");
+      for (const presetId of styleAppliesTo(style.id)) {
+        const p = pendantStyleParameters(presetId, style.id);
+        const preset = getPreset(presetId);
+        expect(preset.status.implementation).toBe("prototype");
+        if (preset.outline.shape === "round") expect(p.outline.widthMm).toBe(preset.outline.diameterMm.value);
+        if (preset.outline.shape === "tablet" || preset.outline.shape === "cushion") {
+          expect(p.outline.widthMm).toBe(preset.outline.widthMm.value);
+          expect(p.outline.heightMm).toBe(preset.outline.heightMm.value);
+        }
+      }
+    }
+    expect(() => pendantStyleParameters("pendant-round-classic", "block")).toThrow(/needs a tablet/);
   });
 });

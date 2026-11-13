@@ -1,22 +1,21 @@
 /**
- * Review-only manufacturer package for the round pendant prototype.
+ * Review-only manufacturer package for a pendant prototype (any style).
  *
  *   <ORDER>_<PD-hash>/
- *   ├─ 01_cad/terrain-pendant.3dm               body and bail as separate objects on separate layers
- *   │         terrain-pendant-body.stl, terrain-pendant-bail.stl   one STL per component
+ *   ├─ 01_cad/terrain-pendant.3dm, terrain-pendant.stl   one solid: body with its attachment
  *   ├─ 02_specification/production-spec.json, validation-report.json, checksum-manifest.json
  *   ├─ 03_visuals/render-*.png (when supplied)
  *   └─ 04_source/design-parameters.json, heightmap.bin, heightmap-metadata.json
  *
- * Always review-only: the dimensions come from a preview-only profile, the bail
- * is an unjoined visual placeholder, and no manufacturing requirement is
- * approved. Components are never merged into one STL, because overlapping
- * shells are not a joined solid.
+ * The attachment is part of the solid (a channel cut by exact boolean, or a
+ * loop or tab united with the body). Always review-only: the dimensions come
+ * from a preview-only style profile, joint strength and chain fit are not
+ * assessed, and no manufacturing requirement is approved.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { validation } from "@avie/geometry";
-import { availabilityOf, PENDANT_PREVIEW_PROFILE } from "@avie/product-types";
+import { availabilityOf } from "@avie/product-types";
 import { boundingBox, signedVolume, weld } from "./mesh";
 import { canonical, PACKAGE_FORMAT_VERSION, sha256 } from "./package-builder";
 import { buildProductionPendant, PENDANT_PRODUCTION_RESOLUTION, type PendantConfiguration } from "./pendant-source";
@@ -24,8 +23,7 @@ import { read3dmComponents, REPRESENTATION_NOTE, write3dmComponents } from "./rh
 import { loadSavedTerrain } from "./ring-source";
 import { readBinaryStl, writeBinaryStl } from "./stl";
 
-export const BODY_LAYER = "Terra pendant body";
-export const BAIL_LAYER = "Terra pendant bail (placeholder, not joined)";
+export const PENDANT_LAYER = "Terra pendant";
 
 export type PendantPackageOptions = {
   config: PendantConfiguration;
@@ -37,13 +35,14 @@ export type PendantPackageOptions = {
 
 export async function buildPendantPackage(opts: PendantPackageOptions) {
   const { config } = opts;
-  const pd = buildProductionPendant(config);
+  const pd = await buildProductionPendant(config);
   const designParameters = {
     productType: "terrain_pendant",
     presetId: pd.preset.id,
-    previewProfile: PENDANT_PREVIEW_PROFILE.id,
+    style: pd.style.id,
+    previewProfile: pd.params.profileId,
     terrain: { place: config.place, lengthM: pd.lengthM, widthM: pd.area.widthM, bearingDeg: config.bearingDeg, terrainHeight: config.terrainHeight, detail: config.detail },
-    pendant: { shape: "round", diameterMm: pd.diameterMm, ...pd.preview },
+    pendant: { outline: pd.params.outline, baseThicknessMm: pd.params.baseThicknessMm, edgeRoundMm: pd.params.edgeRoundMm, fadeMm: pd.params.fadeMm, coverage: pd.params.coverage, maximumReliefMm: pd.params.maximumReliefMm, attachment: pd.params.attachment },
     material: { metal: config.metal, finish: config.finish, densityGcm3: pd.densityGcm3 },
     resolution: PENDANT_PRODUCTION_RESOLUTION,
     geometryVersion: opts.geometryVersion,
@@ -56,95 +55,75 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   const dir = (p: string) => { mkdirSync(join(root, p), { recursive: true }); return join(root, p); };
   const cad = dir("01_cad"), spec = dir("02_specification"), visuals = dir("03_visuals"), src = dir("04_source");
 
-  // --- CAD: each component separately --------------------------------------
-  const components = [
-    { id: "body", mesh: pd.body, file: "terrain-pendant-body.stl", layer: BODY_LAYER, role: "generated body" },
-    { id: "bail", mesh: pd.bail, file: "terrain-pendant-bail.stl", layer: BAIL_LAYER, role: "visual placeholder bail, not joined to the body" },
-  ];
-  const stl = components.map((c) => writeBinaryStl(c.mesh, `Terra pendant ${c.id} ${designRef} mm 1:1`));
-  const meshHashes = Object.fromEntries(components.map((c, i) => [c.id, sha256(stl[i]!)]));
+  // --- CAD: one solid ---------------------------------------------------------
+  const stlBytes = writeBinaryStl(pd.mesh, `Terra pendant ${designRef} mm 1:1`);
+  const meshHash = sha256(stlBytes);
   const documentMeta: Record<string, string> = {
-    designRef, designHash, orderRef: opts.orderRef, productType: "terrain_pendant", presetId: pd.preset.id,
-    previewProfile: PENDANT_PREVIEW_PROFILE.id, geometryVersion: opts.geometryVersion, packageFormat: PACKAGE_FORMAT_VERSION,
-    status: "review_only", componentCount: String(components.length), assembly: pd.assembly.relationship,
+    designRef, designHash, orderRef: opts.orderRef, productType: "terrain_pendant", presetId: pd.preset.id, style: pd.style.id,
+    previewProfile: pd.params.profileId, geometryVersion: opts.geometryVersion, packageFormat: PACKAGE_FORMAT_VERSION,
+    status: "review_only", attachment: pd.params.attachment.kind, meshSha256OfStl: meshHash,
   };
-  const dm = await write3dmComponents(
-    components.map((c) => ({ mesh: c.mesh, layer: c.layer, name: `Terra pendant ${c.id} ${designRef}`, metadata: { component: c.id, role: c.role, meshSha256OfStl: meshHashes[c.id]! } })),
-    documentMeta,
-  );
-  components.forEach((c, i) => writeFileSync(join(cad, c.file), stl[i]!));
+  const dm = await write3dmComponents([{ mesh: pd.mesh, layer: PENDANT_LAYER, name: `Terra pendant ${designRef}`, metadata: { component: "pendant", attachment: pd.params.attachment.kind } }], documentMeta);
+  writeFileSync(join(cad, "terrain-pendant.stl"), stlBytes);
   writeFileSync(join(cad, "terrain-pendant.3dm"), dm);
 
-  // --- Reopen checks: each file must reproduce its component -----------------
+  // --- Reopen checks: both files must reproduce the solid ----------------------
   const near = (a: number[], b: number[], tol: number) => a.every((v, i) => Math.abs(v - b[i]!) <= tol);
-  const dmBack = await read3dmComponents(readFileSync(join(cad, "terrain-pendant.3dm")), ["component", "role", "units"], Object.keys(documentMeta));
-  const reopen: Record<string, Record<string, unknown>> = {};
-  components.forEach((c) => {
-    const back = weld(readBinaryStl(readFileSync(join(cad, c.file))).mesh);
-    const box = boundingBox(c.mesh), volume = signedVolume(c.mesh);
-    const obj = dmBack.objects.find((o) => o.userStrings.component === c.id);
-    reopen[`stl_${c.id}`] = {
+  const box = boundingBox(pd.mesh), volume = signedVolume(pd.mesh);
+  const back = weld(readBinaryStl(readFileSync(join(cad, "terrain-pendant.stl"))).mesh);
+  const dmBack = await read3dmComponents(readFileSync(join(cad, "terrain-pendant.3dm")), ["component", "units"], Object.keys(documentMeta));
+  const obj = dmBack.objects[0];
+  const reopen = {
+    stl: {
       triangles: back.indices.length / 3,
-      matchesTriangleCount: back.indices.length === c.mesh.indices.length,
+      matchesTriangleCount: back.indices.length === pd.mesh.indices.length,
       matchesBoundingBox: near(boundingBox(back).min, box.min, 1e-4) && near(boundingBox(back).max, box.max, 1e-4),
       matchesVolume: Math.abs(signedVolume(back) - volume) <= Math.abs(volume) * 1e-6,
-    };
-    reopen[`3dm_${c.id}`] = {
+    },
+    "3dm": {
+      units: dmBack.units,
       layer: obj?.layerName ?? null,
-      present: obj !== undefined,
-      onExpectedLayer: obj?.layerName === c.layer,
-      matchesTriangleCount: obj?.triangleCount === c.mesh.indices.length / 3,
-      matchesVertexCount: obj?.vertexCount === c.mesh.positions.length / 3,
+      unitsAreMillimetres: dmBack.units === "Millimeters",
+      singleObject: dmBack.objects.length === 1,
+      onExpectedLayer: obj?.layerName === PENDANT_LAYER,
+      matchesTriangleCount: obj?.triangleCount === pd.mesh.indices.length / 3,
+      matchesVertexCount: obj?.vertexCount === pd.mesh.positions.length / 3,
       matchesBoundingBox: obj ? near(obj.bbox.min, box.min, 1e-4) && near(obj.bbox.max, box.max, 1e-4) : false,
-    };
-  });
-  reopen["3dm_document"] = {
-    units: dmBack.units,
-    unitsAreMillimetres: dmBack.units === "Millimeters",
-    objectCountMatches: dmBack.objects.length === components.length,
-    metadataIntact: Object.entries(documentMeta).every(([k, v]) => dmBack.documentStrings[k] === v),
+      metadataIntact: Object.entries(documentMeta).every(([k, v]) => dmBack.documentStrings[k] === v),
+    },
   };
   const reopenOk = Object.values(reopen).every((r) => Object.values(r).every((v) => typeof v !== "boolean" || v));
 
-  // --- Validation: per component, plus what cannot be assessed -----------------
+  // --- Validation: the solid, plus what cannot be assessed ------------------------
   const profile = { id: "awaiting-manufacturer", approved: false, minWallMm: null, minFeatureMm: null, maxReliefMm: null };
-  const reliefMm = pd.dimensions.body.depthMm - pd.preview.baseThicknessMm;
-  /** The report as written: raw per-sample readings are left out of the JSON. */
-  const summary = (r: ReturnType<typeof validation.validateMesh>) => {
-    const { wall, feature, ...rest } = r;
-    void wall;
-    void feature;
-    return rest;
+  const reliefMm = Math.max(0, pd.built.dimensions.body.depthMm - pd.params.baseThicknessMm);
+  const { wall, feature, ...solidReport } = validation.validateMesh(pd.mesh, {
+    productType: "terrain_pendant", profile, densityGcm3: pd.densityGcm3, reliefMm, surfaceLabels: pd.mesh.surfaceLabels,
+  });
+  void wall;
+  void feature;
+  const attachmentChecks = Object.fromEntries(
+    pd.built.checks.map((c) => [c.name, { status: c.ok ? ("pass" as const) : ("fail" as const), method: "geometric validity only (greater than zero); no manufacturing minimum applied", note: c.detail }]),
+  );
+  const extra = {
+    ...attachmentChecks,
+    genus: { status: pd.built.genus === (pd.params.attachment.kind === "none" ? 0 : 1) ? ("pass" as const) : ("fail" as const), method: "holes through the solid (manifold genus)", measured: pd.built.genus, note: "Expected 1: the chain channel, or the opening of the loop or tab." },
+    attachmentStrength: { status: "not_run" as const, method: "none", note: "Joint strength, chain fit and wear are not assessed; they need the manufacturer and the chosen chain." },
+    minimumRimAngle: { status: "not_run" as const, method: "not implemented for pendant outlines", note: "The ring's rim check covers straight long sides of a rectangular face; a perimeter-wide version for pendants is planned." },
   };
-  const bodyReport = summary(validation.validateMesh(pd.body, {
-    productType: "terrain_pendant", profile, densityGcm3: pd.densityGcm3, reliefMm, surfaceLabels: pd.body.surfaceLabels,
-  }));
-  const bailReport = summary(validation.validateMesh(pd.bail, { productType: "terrain_pendant", profile, densityGcm3: pd.densityGcm3 }));
-  const assemblyCheck = {
-    status: "not_run" as const,
-    method: "none: no join between components is modelled",
-    note: pd.assembly.relationship,
-  };
-  const rimCheck = {
-    status: "not_run" as const,
-    method: "not applicable as built: the terrain fades to a plain rim before the edge round",
-    note: "The ring's rim-angle check measures terrain meeting a vertical wall; this pendant has no such junction.",
-  };
-  const valid = bodyReport.valid && bailReport.valid;
+  const valid = solidReport.valid && Object.values(attachmentChecks).every((c) => c.status === "pass") && extra.genus.status === "pass";
   const availability = availabilityOf(pd.preset);
   const validationReport = {
-    productType: "terrain_pendant",
-    validatorVersion: bodyReport.validatorVersion,
+    ...solidReport,
     valid,
     status: valid ? "held_for_review" : "fail",
-    constraintProfile: { id: profile.id, approved: false },
-    components: { body: bodyReport, bail: bailReport },
-    checks: { componentJoin: assemblyCheck, minimumRimAngle: rimCheck },
+    checks: { ...solidReport.checks, ...extra } as Record<string, validation.Check> & typeof extra,
     reopen,
     reopenPassed: reopenOk,
     limitations: [
-      "Body and bail are validated separately. Overlapping shells are not a joined solid; the join is not assessed.",
-      "Dimensions come from the preview-only profile; no manufacturing requirement is approved, so nothing is judged against a minimum.",
+      "Body and attachment are one solid, joined by exact mesh booleans (seams cleaned within 0.0001 mm). Joint strength is not assessed.",
+      "Structural wall includes the metal around the chain channel, where present; it is reported, not judged.",
+      "Dimensions come from a preview-only style profile; no manufacturing requirement is approved, so nothing is judged against a minimum.",
       "Feature size is measured by the sphere method on terrain triangles and reported only.",
       "No check here establishes casting suitability; that requires the manufacturer's approved requirements and a physical sample.",
     ],
@@ -158,8 +137,8 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   writeFileSync(join(src, "heightmap-metadata.json"), JSON.stringify({
     format: "float32 little-endian, row-major, metres above sea level",
     cols: pd.elevations.cols, rows: pd.elevations.rows,
-    rowOrder: "row 0 = north edge of the frame at bearing 0 (towards the bail)", colOrder: "col 0 = west edge (left)",
-    crop: "square frame of side = body diameter, masked to the circle (cropped, not stretched)",
+    rowOrder: "row 0 = north edge of the frame at bearing 0 (towards the top of the piece)", colOrder: "col 0 = west edge (left)",
+    crop: "frame of the body's own width and height, masked to its outline (cropped, not stretched)",
     groundLengthM: pd.lengthM, groundWidthM: pd.area.widthM, bearingDeg: config.bearingDeg,
     savedSource: { place: config.place, id: saved.meta.id, sha256: sha256(saved.png) },
     sha256: sha256(heightmapBytes),
@@ -173,56 +152,47 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
       if (existsSync(join(opts.rendersDir, from))) { copyFileSync(join(opts.rendersDir, from), join(visuals, to)); rendersIncluded.push(to); }
 
   // --- Specification -----------------------------------------------------------
-  const d = pd.dimensions;
-  const massG = (mm3: number) => +((mm3 / 1000) * pd.densityGcm3).toFixed(2);
+  const d = pd.built.dimensions;
   const productionSpec = {
     packageFormat: PACKAGE_FORMAT_VERSION,
     status: "review_only",
-    statusReason: "Prototype for manufacturer review. Dimensions come from a preview-only profile, the bail is an unjoined placeholder and no manufacturing requirement is approved.",
+    statusReason: "Prototype for manufacturer review. Dimensions come from a preview-only style profile, joint strength and chain fit are not assessed, and no manufacturing requirement is approved.",
     releaseBlockedBy: availability.blockedBy.manufacturingRelease,
     orderRef: opts.orderRef,
     designRef,
     designHash,
-    product: "À Vie Terra Pendant (prototype)",
+    product: `À Vie Terra Pendant, ${pd.style.label} (prototype)`,
     productType: "terrain_pendant",
     presetId: pd.preset.id,
+    style: { id: pd.style.id, label: pd.style.label, attachment: pd.params.attachment, note: pd.style.attachmentNote },
     units: "millimetres",
     scale: "1:1 finished nominal dimensions (no shrinkage compensation, supports or sprues added)",
-    coordinateSystem: "Right-handed, the piece lying face-up: origin at the body centre on the back plane; +Y relief; +X right seen from the front; bail towards −Z. Terrain north towards the bail. STL files carry no units: coordinates are millimetres.",
-    dimensions: {
-      body: { diameterMm: d.body.diameterMm, depthMm: d.body.depthMm, baseThicknessMm: pd.preview.baseThicknessMm, terrainReliefMm: +reliefMm.toFixed(3), note: "Body excludes the bail." },
-      overall: { ...d.overall, note: "Including the bail." },
-    },
-    estimatedMassG: { body: massG(d.body.volumeMm3), bail: massG(d.bail!.volumeMm3), metal: config.metal, note: "Per component; the overlap between bail and body is not subtracted." },
-    previewOnlyValues: Object.fromEntries(Object.entries(PENDANT_PREVIEW_PROFILE.values).map(([k, v]) => [k, { value: v.value, status: v.status, note: v.note }])),
+    coordinateSystem: "Right-handed, the piece lying face-up: origin at the body centre on the back plane; +Y relief; +X right seen from the front; top of the piece towards −Z. Terrain north towards the top. STL files carry no units: coordinates are millimetres.",
+    dimensions: { body: { ...d.body, terrainReliefMm: +reliefMm.toFixed(3) }, overall: { ...d.overall, note: "Including the attachment." } },
+    terrainCoverage: pd.params.coverage,
+    estimatedMassG: { value: +((d.volumeMm3 / 1000) * pd.densityGcm3).toFixed(2), metal: config.metal },
+    previewOnlyValues: Object.fromEntries(Object.entries(pd.style.values).map(([k, v]) => [k, { value: v.value, status: v.status, note: v.note }])),
     manufacturingRequirements: Object.fromEntries(Object.entries(pd.preset.manufacturing).map(([k, v]) => [k, { value: v.value, status: v.status, owner: v.owner, note: v.note }])),
     components: [
-      { id: "body", generated: true, files: ["01_cad/terrain-pendant-body.stl", `01_cad/terrain-pendant.3dm (layer "${BODY_LAYER}")`] },
-      { id: "bail", generated: true, visualPlaceholder: true, joinedToBody: false, files: ["01_cad/terrain-pendant-bail.stl", `01_cad/terrain-pendant.3dm (layer "${BAIL_LAYER}")`] },
+      { id: "pendant", generated: true, attachmentIncluded: pd.params.attachment.kind, files: ["01_cad/terrain-pendant.stl", `01_cad/terrain-pendant.3dm (layer "${PENDANT_LAYER}")`] },
       { id: "chain", generated: false, supplied: true, status: "awaiting an approved supplied chain; not part of the cast pendant" },
     ],
-    assembly: pd.assembly.relationship,
     files: {
-      "01_cad/terrain-pendant.3dm": `Rhino 3DM, two separate mesh objects (${REPRESENTATION_NOTE}), millimetres.`,
-      "01_cad/terrain-pendant-body.stl": "Binary STL of the body only.",
-      "01_cad/terrain-pendant-bail.stl": "Binary STL of the placeholder bail only.",
-      "02_specification/validation-report.json": "Automated checks per component, with methods and limitations.",
+      "01_cad/terrain-pendant.3dm": `Rhino 3DM, one mesh object (${REPRESENTATION_NOTE}), millimetres.`,
+      "01_cad/terrain-pendant.stl": "Binary STL of the same solid.",
+      "02_specification/validation-report.json": "Automated checks with methods and limitations.",
       "04_source/heightmap.bin": "Exact elevation samples the face was built from.",
     },
-    notGenerated: [
-      "production-spec.pdf (this JSON is authoritative)",
-      "a joined body-and-bail solid (the join is a manufacturer decision)",
-      ...Object.keys(renders).filter((r) => !rendersIncluded.includes(r)).map((r) => `03_visuals/${r}`),
-    ],
+    notGenerated: ["production-spec.pdf (this JSON is authoritative)", ...Object.keys(renders).filter((r) => !rendersIncluded.includes(r)).map((r) => `03_visuals/${r}`)],
     questionsForManufacturer: [
       "Base thickness, maximum relief, minimum feature size and edge radius for this alloy.",
-      "Bail design: integrated loop or separate bail, its section, opening and how it joins the body.",
-      "Which chain, and its end-fitting dimensions, the bail must suit.",
-      "Is a mesh 3DM with separate components acceptable, and in which Rhino version?",
+      pd.params.attachment.kind === "through_hole" ? "Chain channel: diameter, wall around it and position, for the chosen chain." : "Bail: section, opening and joint to the body, for the chosen chain.",
+      "Which chain, and its end-fitting dimensions, the attachment must suit.",
+      "Is a mesh 3DM acceptable, and in which Rhino version?",
       "Who adds shrinkage, supports and sprues?",
     ],
-    qcChecklist: ["Body diameter and depth match", "Terrain matches the preview", "Plain rim even all round", "Bail opening suits the chosen chain", "No porosity, cracks or pits", "Correct metal and finish", "Hallmark where required"],
-    claims: { editableNurbs: false, castingReady: false, joinedBail: false, note: "Separate closed meshes only. Casting suitability requires the manufacturer's review and a physical sample." },
+    qcChecklist: ["Body width, height and depth match", "Terrain matches the preview", "Edges even all round", "Chain passes freely through the attachment", "No porosity, cracks or pits", "Correct metal and finish", "Hallmark where required"],
+    claims: { editableNurbs: false, castingReady: false, attachmentStrengthAssessed: false, note: "One closed mesh solid. Casting suitability requires the manufacturer's review and a physical sample." },
   };
   writeFileSync(join(spec, "production-spec.json"), JSON.stringify(productionSpec, null, 2));
 
@@ -238,6 +208,6 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   walk(root);
   writeFileSync(join(spec, "checksum-manifest.json"), JSON.stringify({ packageFormat: PACKAGE_FORMAT_VERSION, algorithm: "SHA-256", files }, null, 2));
 
-  return { root, designRef, designHash, meshHashes, report: validationReport, spec: productionSpec, reopenOk };
+  return { root, designRef, designHash, meshHash, report: validationReport, spec: productionSpec, reopenOk };
 }
 

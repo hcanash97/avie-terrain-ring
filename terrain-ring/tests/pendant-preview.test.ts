@@ -1,23 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { buildPendantPreview, pendantDisplayMesh } from "../src/geometry/pendant-preview";
+import { buildPendantPreview, pendantDisplayMesh, presetFor } from "../src/geometry/pendant-preview";
 import { meshVolume } from "../src/geometry/ring-blank";
 
 const hill = { radiusM: 20000, elevationAt: (e: number, n: number) => 500 + 300 * Math.exp(-(e * e + n * n) / 2e6) };
 
 describe("internal pendant preview", () => {
-  const built = buildPendantPreview({ source: hill, lengthM: 6000, bearingDeg: 0, terrainHeight: 1, detail: "high", flat: false });
+  it.each([["circle", "pendant-round-classic", 18, 18], ["block", "pendant-tablet-classic", 12, 20], ["charm", "pendant-cushion-classic", 16, 16]] as const)(
+    "%s uses the catalogue size and its style's preview-only profile",
+    async (style, presetId, w, h) => {
+      expect(presetFor(style, "classic")).toBe(presetId);
+      const b = await buildPendantPreview({ style, tier: "classic", source: hill, lengthM: 6000, bearingDeg: 0, terrainHeight: 1, detail: "high" });
+      expect(b.built.dimensions.body).toMatchObject({ widthMm: w, heightMm: h });
+      expect(b.params.profileId).toMatch(/preview-dev-1$/);
+      expect(b.built.genus).toBe(1);
+    },
+    60000,
+  );
 
-  it("uses the catalogue diameter and the preview-only profile", () => {
-    expect(built.dimensions.body.diameterMm).toBeCloseTo(18, 6);
-    expect(built.profileId).toBe("pendant-preview-dev-1");
-  });
-
-  it("stands the pendant up for display without mirroring it", () => {
-    const m = pendantDisplayMesh(built.pendant);
+  it("stands the pendant up for display without mirroring it", async () => {
+    const b = await buildPendantPreview({ style: "circle-loop", tier: "classic", source: hill, lengthM: 6000, bearingDeg: 0, terrainHeight: 1, detail: "high" });
+    const m = pendantDisplayMesh(b.built.mesh);
     expect(meshVolume(m)).toBeGreaterThan(0); // a reflection would turn the volume negative
     let topY = -Infinity, bottomY = Infinity;
     for (let i = 1; i < m.positions.length; i += 3) { topY = Math.max(topY, m.positions[i]!); bottomY = Math.min(bottomY, m.positions[i]!); }
-    expect(topY).toBeCloseTo(built.dimensions.overall.heightMm - 9, 3); // bail at the top
+    expect(topY).toBeCloseTo(b.built.dimensions.overall.heightMm - 9, 2); // loop at the top
     expect(bottomY).toBeCloseTo(-9, 3);
-  });
+  }, 60000);
 });

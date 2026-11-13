@@ -10,6 +10,7 @@
     "./terrain-pendant": "./src/products/terrain-pendant/index.ts"
   },
   "dependencies": {
-    "@avie/terrain": "*"
+    "@avie/terrain": "*",
+    "manifold-3d": "3.5.4"
   }
 }
