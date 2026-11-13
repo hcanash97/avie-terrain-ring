@@ -30,6 +30,8 @@ The preview field is the non-production branch deploy command. Enable preview bu
 
 Node is pinned to 24 in `.node-version`, the same major version CI requests. The Workers Builds image reads that file. Its current Node 24 build is 24.22.1, which is already on the image.
 
+`npx wrangler preview` also requires a `previews` block in `wrangler.jsonc`; without it every preview build fails at the deploy step with "Your Wrangler configuration is missing a `previews` block". The block is present and empty, so previews inherit the Worker's assets and compatibility settings.
+
 ### Commands
 
 From the repository root:
