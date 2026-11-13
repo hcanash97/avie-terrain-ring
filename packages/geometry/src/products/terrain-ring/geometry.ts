@@ -20,6 +20,12 @@
  */
 import { sampleBilinear, type TerrainRelief } from "@avie/terrain";
 import type { TerrainProductMesh } from "../shared/types";
+import {
+  RING_GEOMETRY_VERSION,
+  usesExplicitInnerCentrePlane,
+  assertRecordedRingGeometryVersion,
+  type RingGeometryVersion,
+} from "./version";
 
 export type Weight = "slim" | "standard" | "bold";
 export type ShoulderStyle = "straight" | "classic" | "curved";
@@ -116,6 +122,49 @@ export type RingParameters = {
 };
 
 export type RingMesh = TerrainProductMesh;
+
+/**
+ * Columns across the inner (finger) surface. The count is odd, so one column
+ * is the centre plane of the ring. The index is that column's place in the
+ * construction, not a test of how close a coordinate already is to zero.
+ */
+export const INNER_SURFACE_COLUMNS = 13;
+export const INNER_CENTRE_COLUMN = (INNER_SURFACE_COLUMNS - 1) / 2;
+
+export type InnerRowKind = "face" | "wall" | "shoulder" | "band";
+
+/** Row order shared by the mesh builder and the centre-column tests. */
+export function ringSectionPlan(resolution: {
+  faceSegments: number;
+  backSegments: number;
+  widthSegments: number;
+}) {
+  const shoulderSteps = Math.max(8, Math.round(resolution.backSegments * 0.28));
+  const bandSteps = Math.max(12, resolution.backSegments - 2 * shoulderSteps);
+  const kinds: InnerRowKind[] = [];
+  for (let i = 0; i <= resolution.faceSegments; i++) kinds.push("face");
+  kinds.push("wall");
+  for (let j = 1; j < shoulderSteps; j++) kinds.push("shoulder");
+  for (let j = 0; j <= bandSteps; j++) kinds.push("band");
+  for (let j = shoulderSteps - 1; j >= 1; j--) kinds.push("shoulder");
+  kinds.push("wall");
+  const outerColumns = resolution.widthSegments + 1;
+  const innerStart = kinds.length * outerColumns;
+  return {
+    shoulderSteps,
+    bandSteps,
+    kinds,
+    rows: kinds.length,
+    outerColumns,
+    innerColumns: INNER_SURFACE_COLUMNS,
+    centreColumn: INNER_CENTRE_COLUMN,
+    innerStart,
+    centreVertices: kinds.map(
+      (_, row) =>
+        innerStart + row * INNER_SURFACE_COLUMNS + INNER_CENTRE_COLUMN,
+    ),
+  };
+}
 
 /** No universal pedestal lift: the support surface supplies the substrate. */
 const BLOCK_BASE_MM = 0;
@@ -235,7 +284,20 @@ type Row =
   | { kind: "shoulder"; side: 1 | -1; t: number; alpha: number }
   | { kind: "band"; alpha: number };
 
-export function createRingMesh(p: RingParameters): RingMesh {
+/**
+ * Build a ring mesh.
+ *
+ * The live generator is {@link RING_GEOMETRY_VERSION} (explicit +0 on the
+ * inner centre column). Pass {@link RING_GEOMETRY_LEGACY} or the historical
+ * configuration stamp to keep the cancellation formula. Replay of a stored
+ * design must go through {@link createRingMeshForRecordedVersion}, which
+ * rejects a missing version instead of substituting the current one.
+ */
+export function createRingMesh(
+  p: RingParameters,
+  geometryVersion: RingGeometryVersion = RING_GEOMETRY_VERSION,
+): RingMesh {
+  const explicitCentrePlane = usesExplicitInnerCentrePlane(geometryVersion);
   const w = p.weight;
   const L = w.faceLengthMm;
   const W = w.faceWidthMm;
@@ -507,9 +569,10 @@ export function createRingMesh(p: RingParameters): RingMesh {
 
   // Rows in increasing angle: face (x from +L/2 to −L/2), −X wall, −X shoulder,
   // band round the back, +X shoulder, +X wall, back to the face.
-  const { faceSegments, backSegments, widthSegments } = p.resolution;
-  const shoulderSteps = Math.max(8, Math.round(backSegments * 0.28));
-  const bandSteps = Math.max(12, backSegments - 2 * shoulderSteps);
+  const { faceSegments, widthSegments } = p.resolution;
+  const plan = ringSectionPlan(p.resolution);
+  const shoulderSteps = plan.shoulderSteps;
+  const bandSteps = plan.bandSteps;
   const rows: Row[] = [];
   for (let i = 0; i <= faceSegments; i++) {
     const x = L / 2 - (L * i) / faceSegments;
@@ -540,6 +603,12 @@ export function createRingMesh(p: RingParameters): RingMesh {
     });
   }
   rows.push({ kind: "wall", side: 1, alpha: 2 * Math.PI - cornerAngle });
+  if (
+    rows.length !== plan.rows ||
+    rows.some((row, index) => row.kind !== plan.kinds[index])
+  ) {
+    throw new Error("Ring row plan does not match the constructed rows");
+  }
   const n = rows.length;
 
   const positions: number[] = [];
@@ -615,6 +684,18 @@ export function createRingMesh(p: RingParameters): RingMesh {
     const h = innerHalfWidth(row);
     if (k === 0) return -h;
     if (k === columns - 1) return h;
+    // Analytically -h + (2*h*k)/(columns-1) is 0 at the middle index. The
+    // cancellation is not exact once h has come through cos/atan2, and the
+    // residual (one to four units in the last place) survives Float32 and
+    // changes the position-buffer hash between environments. The corrected
+    // algorithm writes positive zero at that index. Other columns, including
+    // the two endpoints, stay on the original expressions.
+    if (
+      explicitCentrePlane &&
+      columns === INNER_SURFACE_COLUMNS &&
+      k === INNER_CENTRE_COLUMN
+    )
+      return +0;
     return -h + (2 * h * k) / (columns - 1);
   };
 
@@ -629,7 +710,7 @@ export function createRingMesh(p: RingParameters): RingMesh {
         ? 1
         : shoulderTerrain(row, zAt(row, k, outerColumns), halfWidth(row)).blend,
   );
-  const innerColumns = 13;
+  const innerColumns = INNER_SURFACE_COLUMNS;
   surface(
     innerColumns,
     (row, k) => innerPoint(row, zInner(row, k, innerColumns)),
@@ -716,6 +797,14 @@ export function createRingMesh(p: RingParameters): RingMesh {
     faceTriangleCount: faceIndices.length / 3,
     triangleCount: (faceIndices.length + indices.length) / 3,
   };
+}
+
+/** Mesh for a version read from a design. Missing versions throw. */
+export function createRingMeshForRecordedVersion(
+  version: string | null | undefined,
+  p: RingParameters,
+): RingMesh {
+  return createRingMesh(p, assertRecordedRingGeometryVersion(version));
 }
 
 export {

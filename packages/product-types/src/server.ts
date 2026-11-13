@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RING_GEOMETRY_VERSION } from "@avie/geometry/terrain-ring";
 import { configurationInputSchema, versionSchema } from "@avie/shared-types";
 import {
   canonicalJSON,
@@ -54,7 +55,7 @@ export function configureProduct(
       constraintVersion: assessment.profile.version,
       constraintHash: sha256(canonicalJSON(assessment.profile)),
       geometryVersion: p.geometryImplemented
-        ? "terra-ring/a7c4afe"
+        ? RING_GEOMETRY_VERSION
         : "unimplemented/v1",
       geometryImplemented: p.geometryImplemented,
     },
