@@ -4,3 +4,4 @@ export * from "./mounts";
 export * from "./compatibility";
 
 export * from "./options";
+export * from "./catalogue";

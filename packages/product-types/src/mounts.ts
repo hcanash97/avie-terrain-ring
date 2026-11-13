@@ -1,30 +1,20 @@
+import { facePreset } from "@avie/geometry/terrain-ring";
 import { configurationInputSchema, mountSchema } from "@avie/shared-types";
 /** Resolves data only: this does not create geometry or validate global thickness. */
 export function resolveMount(input: unknown) {
   const c = configurationInputSchema.parse(input),
     s = c.selection;
   if (s.productType === "terrain_ring") {
-    const i = { slim: 0, standard: 1, bold: 2 }[s.options.weight];
-    const dimensions =
-      s.options.headShape === "bar"
-        ? [
-            [12, 5.5],
-            [13, 7.5],
-            [14, 10],
-          ]
-        : [
-            [10.5, 9.5],
-            [12, 11],
-            [14, 13],
-          ];
+    // Read from the geometry presets (single source of truth), never a copied table.
+    const preset = facePreset(s.options.weight, s.options.headShape);
     return mountSchema.parse({
       policyId: "legacy-integrated-ring",
       version: 1,
       faceShape: s.options.headShape,
-      heightMm: dimensions[i]![0],
-      widthMm: dimensions[i]![1],
-      substrateMm: 0.9,
-      reliefLimitMm: [2, 2.4, 2.8][i],
+      heightMm: preset.faceLengthMm,
+      widthMm: preset.faceWidthMm,
+      substrateMm: preset.headHeightMm,
+      reliefLimitMm: preset.maxReliefMm,
       crop: c.crop,
       units: "mm",
       axes: "X-right_Y-relief_Z-face",
@@ -42,8 +32,9 @@ export function resolveMount(input: unknown) {
     faceShape: o.faceShape,
     widthMm: o.widthMm,
     heightMm: o.heightMm,
-    substrateMm: s.productType === "terrain_pendant" ? 1.4 : 1.8,
-    reliefLimitMm: s.productType === "terrain_pendant" ? 2.5 : 3,
+    // Unknown until the manufacturer supplies them; never invented here.
+    substrateMm: null,
+    reliefLimitMm: null,
     crop: c.crop,
     units: "mm",
     axes: "X-right_Y-relief_Z-face",
