@@ -8,9 +8,11 @@ import { resolve } from "node:path";
 import { PNG } from "pngjs";
 import { buildTerrain, frameFor, sampleFrame, type Detail, type TerrainSource } from "@avie/terrain";
 import {
+  assertRecordedRingGeometryVersion,
   createRingMesh,
   facePreset,
   METAL_DENSITY_G_CM3,
+  RING_GEOMETRY_VERSION,
   type BandProfile,
   type HeadShape,
   type ShoulderStyle,
@@ -68,7 +70,12 @@ export function loadSavedTerrain(place: string): { source: TerrainSource; meta: 
   return { source, meta, png };
 }
 
-export function buildProductionRing(config: RingConfiguration) {
+export function buildProductionRing(config: RingConfiguration, recordedGeometryVersion?: string | null) {
+  // Omitted means a new build of the current algorithm. A provided value is a
+  // recorded design version: missing or unknown must not fall through to current.
+  const geometryAlgorithm = recordedGeometryVersion === undefined
+    ? RING_GEOMETRY_VERSION
+    : assertRecordedRingGeometryVersion(recordedGeometryVersion);
   const preset = facePreset(config.weight, config.headShape);
   const lengthM = config.lengthM ?? PRESET_LENGTH_M[config.place] ?? 6000;
   const { source } = loadSavedTerrain(config.place);
@@ -85,7 +92,7 @@ export function buildProductionRing(config: RingConfiguration) {
     profile: config.profile,
     terrain,
     resolution: PRODUCTION_RESOLUTION
-  });
+  }, geometryAlgorithm);
   const mesh: IndexedMesh = weld({ positions: raw.positions, indices: raw.indices, surfaceLabels: raw.surfaceLabels });
   // Relief: highest terrain point above the head's table.
   const tableY = innerDiameterMm / 2 + Math.max(preset.headHeightMm, 0.8);
@@ -100,6 +107,7 @@ export function buildProductionRing(config: RingConfiguration) {
     elevations: { data: elevations, cols: PRODUCTION_RESOLUTION.cols, rows },
     innerDiameterMm,
     reliefMm: maxY - tableY,
-    densityGcm3: METAL_DENSITY_G_CM3[config.metal]
+    densityGcm3: METAL_DENSITY_G_CM3[config.metal],
+    geometryAlgorithm
   };
 }

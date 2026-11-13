@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.2
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -49,3 +49,57 @@ jobs:
 
       - name: Build configurator
         run: npm --prefix terrain-ring run build
+
+      - name: Record centre-column coordinate diff
+        run: CENTRE_COORDINATE_DIFF="${{ runner.temp }}/centre-diff.json" npx vitest run packages/geometry/tests/centre-plane.test.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: centre-diff-Linux-X64
+          path: ${{ runner.temp }}/centre-diff.json
+          if-no-files-found: error
+
+  # Same frozen install and the same Node as the Linux job. The centre-plane
+  # baseline must match here as well as on Linux x64. This does not claim a
+  # result for any other platform.
+  macos-arm64:
+    name: Typecheck, lint, test, build (macOS arm64)
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            terrain-ring/package-lock.json
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Install configurator
+        run: npm --prefix terrain-ring ci
+
+      - name: Typecheck, lint and workspace tests
+        run: npm run check
+
+      - name: Configurator tests
+        run: npm --prefix terrain-ring test
+
+      - name: Measurement reports are up to date
+        run: git diff --exit-code -- MEASUREMENTS.md TERRA_VOLUME_COMPARISON.md
+
+      - name: Build configurator
+        run: npm --prefix terrain-ring run build
+
+      - name: Record centre-column coordinate diff
+        run: CENTRE_COORDINATE_DIFF="${{ runner.temp }}/centre-diff.json" npx vitest run packages/geometry/tests/centre-plane.test.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: centre-diff-macOS-ARM64
+          path: ${{ runner.temp }}/centre-diff.json
+          if-no-files-found: error

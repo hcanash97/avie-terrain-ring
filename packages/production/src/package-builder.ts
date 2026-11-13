@@ -61,7 +61,11 @@ export async function buildRingPackage(opts: PackageOptions) {
     },
     material: { metal: config.metal, finish: config.finish, densityGcm3: ring.densityGcm3 },
     resolution: PRODUCTION_RESOLUTION,
-    geometryVersion: opts.geometryVersion
+    // geometryVersion is the caller's build label (often a git revision).
+    // geometryAlgorithm is the mesh construction that ran. The label does not
+    // choose the algorithm, and neither field checksums an issued file.
+    geometryVersion: opts.geometryVersion,
+    geometryAlgorithm: ring.geometryAlgorithm
   };
   const saved = loadSavedTerrain(config.place);
   const heightmapBytes = new Uint8Array(ring.elevations.data.buffer.slice(0));
@@ -84,6 +88,7 @@ export async function buildRingPackage(opts: PackageOptions) {
     orderRef: opts.orderRef,
     productType: "terrain_ring",
     geometryVersion: opts.geometryVersion,
+    geometryAlgorithm: ring.geometryAlgorithm,
     packageFormat: PACKAGE_FORMAT_VERSION,
     meshSha256OfStl: meshHash,
     status: "review_only"
@@ -258,6 +263,9 @@ export async function buildRingPackage(opts: PackageOptions) {
     }
   };
   walk(root);
+  // The manifest names the exact bytes written by this run. It is not rewritten
+  // after checksumming, and agreeing position buffers do not make STL or 3DM
+  // bytes the same on another machine.
   writeFileSync(join(spec, "checksum-manifest.json"), JSON.stringify({ packageFormat: PACKAGE_FORMAT_VERSION, algorithm: "SHA-256", files }, null, 2));
 
   return { root, designRef, designHash, meshHash, report: validationReport, spec: productionSpec, reopenOk };
