@@ -1,0 +1,51 @@
+# Runs every existing check on pull requests and on main.
+# Needs no secrets: tests use in-process PGlite and local fixtures only.
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            terrain-ring/package-lock.json
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Install configurator
+        run: npm --prefix terrain-ring ci
+
+      - name: Typecheck, lint and workspace tests
+        run: npm run check
+
+      - name: Configurator tests
+        run: npm --prefix terrain-ring test
+
+      - name: Measurement reports are up to date
+        # The configurator tests regenerate these reports. A geometry change must
+        # commit its regenerated reports; CI never updates them on its own.
+        run: git diff --exit-code -- MEASUREMENTS.md TERRA_VOLUME_COMPARISON.md
+
+      - name: Build configurator
+        run: npm --prefix terrain-ring run build
