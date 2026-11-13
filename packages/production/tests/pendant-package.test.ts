@@ -23,7 +23,7 @@ describe("multi-component 3DM", () => {
 });
 
 describe("review-only pendant package", () => {
-  const config = { presetId: "pendant-tablet-classic", style: "block" as const, place: "Snowdon, GB", bearingDeg: 0, terrainHeight: 0.7, detail: "high" as const, metal: "silver_925" as const, finish: "polished" as const };
+  const config = { presetId: "pendant-tablet-classic", style: "tablet_slider" as const, place: "Snowdon, GB", bearingDeg: 0, terrainHeight: 0.7, detail: "high" as const, metal: "silver_925" as const, finish: "polished" as const };
 
   it("writes one joined solid, reopens it, hashes every file and stays review-only", async () => {
     const a = await buildPendantPackage({ config, orderRef: "TEST-P1", outDir: mkdtempSync(join(tmpdir(), "terra-pd-")), geometryVersion: "test" });
@@ -46,13 +46,19 @@ describe("review-only pendant package", () => {
     expect(a.reopenOk).toBe(true);
     const dm = await read3dmComponents(readFileSync(join(a.root, "01_cad/terrain-pendant.3dm")), ["component"], ["status", "style"]);
     expect(dm.objects.map((o) => o.layerName)).toEqual([PENDANT_LAYER]);
-    expect(dm.documentStrings).toMatchObject({ status: "review_only", style: "block" });
+    expect(dm.documentStrings).toMatchObject({ status: "review_only", style: "tablet_slider" });
 
     // Validation: sound solid with its channel; what is not assessed is never a pass.
     const r = a.report;
     expect(r.errors).toEqual([]);
     expect(r.status).toBe("held_for_review");
-    expect(r.checks.genus).toMatchObject({ status: "pass", measured: 1 });
+    expect(r.checks.topology).toMatchObject({ status: "pass", measured: 1, required: 1 });
+    // The files as written, reopened, have the style's declared topology.
+    expect(r.reopen.expectedTopology).toMatchObject({ shells: 1, genus: 1 });
+    expect(r.reopen.stlTopology).toMatchObject({ shells: 1, genus: 1, boundaryEdges: 0, nonManifoldEdges: 0, misorientedEdges: 0, matchesExpected: true });
+    expect(r.reopen["3dmTopology"]).toMatchObject({ shells: 1, genus: 1, matchesExpected: true });
+    expect(r.checks.triangleQuality?.measured).toBeDefined();
+    expect(r.checks.attachmentDiagnostics.measured).toMatchObject({ kind: "through_hole", metalBehindMm: 0.9, metalInFrontUnderBaselineMm: 0.9 });
     expect(r.checks.holeBelowTopEdge?.status).toBe("pass");
     expect(r.checks.holeInsideBase?.method).toMatch(/no manufacturing minimum applied/);
     expect(r.checks.attachmentStrength.status).toBe("not_run");
@@ -66,7 +72,8 @@ describe("review-only pendant package", () => {
     expect(s.releaseBlockedBy.join(" ")).toMatch(/unapproved manufacturing requirements/);
     for (const v of Object.values(s.previewOnlyValues)) expect(v.status).toBe("preview_only");
     for (const v of Object.values(s.manufacturingRequirements)) expect(v.value).toBeNull();
-    expect(s.style).toMatchObject({ id: "block", attachment: { kind: "through_hole" } });
+    expect(s.style).toMatchObject({ id: "tablet_slider", label: "Terrain Tablet Pendant", attachment: { kind: "through_hole" } });
+    expect(s.estimatedMassG.densitySource).toMatch(/not supplied by the manufacturer/);
     expect(s.components.find((c) => c.id === "chain")).toMatchObject({ generated: false });
     expect(s.dimensions.body).toMatchObject({ widthMm: 12, heightMm: 20 });
     expect(s.coordinateSystem).toMatch(/STL files carry no units/);

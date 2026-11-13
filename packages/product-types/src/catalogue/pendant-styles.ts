@@ -1,8 +1,9 @@
 /**
  * Pendant styles for the prototype: how a catalogue preset (shape and size) is
- * made into a piece. The forms are general jewellery types (a pierced disc on
- * a slider chain, a solid block, a cushion charm on a folded tab, a disc on a
- * loop), interpreted for À Vie; final names and choices are À Vie's.
+ * made into a piece. The forms are general jewellery types (a tablet and a
+ * medallion on a slider channel, a cushion on a folded tab, and an internal
+ * disc-on-loop prototype), interpreted for À Vie; names are proposals for
+ * À Vie to approve.
  *
  * Every number here is preview_only: it lets the prototype render and be
  * reviewed, and it can never make a preset eligible for production.
@@ -15,12 +16,20 @@ import { PENDANT_PREVIEW_PROFILE } from "./preview-profiles";
 const SOURCE = "Proposed by the coding agent for the style prototypes, 13 Nov 2026 (preview only, not a manufacturing value)";
 const pv = (value: number, note: string) => spec.previewOnly(value, SOURCE, note);
 
-export type PendantStyleId = "circle" | "circle-loop" | "block" | "charm";
+export type PendantStyleId = "tablet_slider" | "cushion_tab" | "round_slider" | "round_loop";
 
 export type PendantStyle = {
   id: PendantStyleId;
+  /** Proposed customer-facing name (À Vie to approve). */
   label: string;
+  /** primary: the proposed collection; internal: kept for review, not offered. */
+  collection: "primary" | "internal";
   profileId: string;
+  /**
+   * Expected topology of the finished solid: one shell, and this many holes
+   * through it (the chain channel, or the opening of the loop or tab).
+   */
+  expectedTopology: { shells: 1; genus: number; note: string };
   /** Catalogue shape this style uses. */
   shape: "round" | "tablet" | "cushion";
   attachment: "through_hole" | "loop" | "tab";
@@ -32,28 +41,76 @@ export type PendantStyle = {
 const loop = PENDANT_PREVIEW_PROFILE.values;
 
 export const PENDANT_STYLES: Record<PendantStyleId, PendantStyle> = {
-  circle: {
-    id: "circle",
-    label: "Circle (hidden chain channel)",
-    profileId: "pendant-circle-preview-dev-1",
+  tablet_slider: {
+    id: "tablet_slider",
+    label: "Terrain Tablet Pendant",
+    collection: "primary",
+    profileId: "pendant-tablet-slider-preview-dev-1",
+    expectedTopology: { shells: 1, genus: 1, note: "One hole: the chain channel through the top." },
+    shape: "tablet",
+    attachment: "through_hole",
+    attachmentNote: "A solid tablet; the chain passes through a hidden channel across the top.",
+    defaultCoverage: { mode: "full" },
+    values: {
+      baseThicknessMm: pv(3.6, "Tablet thickness below the terrain baseline; holds the chain channel."),
+      maximumReliefMm: pv(1.4, "Terrain at 100% height."),
+      edgeRoundMm: pv(0.4, "Edge rounds."),
+      terrainFadeMm: pv(0, "Terrain runs crisp to the edge."),
+      cornerRadiusMm: pv(0.6, "Plan corner radius (the catalogue's corner treatment is undecided)."),
+      channelDiameterMm: pv(1.8, "Chain channel diameter; not yet matched to any chain."),
+      channelFromTopMm: pv(2.2, "Channel centre below the top edge."),
+      channelHeightMm: pv(1.8, "Channel centre above the back."),
+    },
+  },
+  cushion_tab: {
+    id: "cushion_tab",
+    label: "Terrain Cushion Pendant",
+    collection: "primary",
+    profileId: "pendant-cushion-tab-preview-dev-1",
+    expectedTopology: { shells: 1, genus: 1, note: "One hole: the opening of the folded tab." },
+    shape: "cushion",
+    attachment: "tab",
+    attachmentNote: "A flat strap folded over the top edge, joined to the cushion.",
+    defaultCoverage: { mode: "full" },
+    values: {
+      baseThicknessMm: pv(1.6, "Body thickness below the terrain baseline."),
+      maximumReliefMm: pv(1.4, "Terrain at 100% height."),
+      edgeRoundMm: pv(0.5, "Edge rounds."),
+      terrainFadeMm: pv(0, "Terrain runs to the edge."),
+      cornerRadiusRatio: pv(0.22, "Cushion corner radius as a share of the smaller side (the catalogue's radius is undecided)."),
+      tabWidthRatio: pv(0.25, "Tab width as a share of the body width."),
+      tabThicknessMm: pv(0.9, "Tab strap thickness."),
+      tabOpeningHeightMm: pv(3.0, "Tab clear opening, vertical; not yet matched to any chain."),
+      tabOpeningDepthMm: pv(2.4, "Tab clear opening, front to back."),
+      tabEmbedMm: pv(1.0, "How far the tab reaches into the top edge."),
+    },
+  },
+  round_slider: {
+    id: "round_slider",
+    label: "Terrain Medallion",
+    collection: "primary",
+    profileId: "pendant-round-slider-preview-dev-1",
+    expectedTopology: { shells: 1, genus: 1, note: "One hole: the chain channel through the top." },
     shape: "round",
     attachment: "through_hole",
     attachmentNote: "The chain passes through a hidden channel across the top of the disc.",
-    defaultCoverage: { mode: "above_level", level: 0.3 },
+    defaultCoverage: { mode: "full" },
     values: {
       baseThicknessMm: pv(2.6, "Disc thickness below the terrain baseline; holds the chain channel."),
       maximumReliefMm: pv(1.2, "Terrain at 100% height."),
       edgeRoundMm: pv(0.4, "Front and back edge rounds."),
       terrainFadeMm: pv(0, "Terrain runs to the edge."),
-      channelDiameterMm: pv(1.6, "Chain channel diameter; must suit the chosen chain."),
+      channelDiameterMm: pv(1.6, "Chain channel diameter; not yet matched to any chain."),
       channelFromTopMm: pv(2.2, "Channel centre below the top edge."),
       channelHeightMm: pv(1.3, "Channel centre above the back."),
     },
   },
-  "circle-loop": {
-    id: "circle-loop",
-    label: "Circle with loop",
+  round_loop: {
+    id: "round_loop",
+    label: "Round loop pendant (internal prototype)",
+    collection: "internal",
     profileId: PENDANT_PREVIEW_PROFILE.id,
+    expectedTopology: { shells: 1, genus: 1, note: "One hole: the opening of the loop." },
     shape: "round",
     attachment: "loop",
     attachmentNote: "A round-section loop above the top edge, joined to the disc.",
@@ -69,47 +126,30 @@ export const PENDANT_STYLES: Record<PendantStyleId, PendantStyle> = {
       loopEmbedMm: loop.bailEmbedMm,
     },
   },
-  block: {
-    id: "block",
-    label: "Block (hidden chain channel)",
-    profileId: "pendant-block-preview-dev-1",
-    shape: "tablet",
-    attachment: "through_hole",
-    attachmentNote: "A solid block; the chain passes through a hidden channel across the top.",
-    defaultCoverage: { mode: "full" },
-    values: {
-      baseThicknessMm: pv(3.6, "Block thickness below the terrain baseline; holds the chain channel."),
-      maximumReliefMm: pv(1.4, "Terrain at 100% height."),
-      edgeRoundMm: pv(0.4, "Edge rounds."),
-      terrainFadeMm: pv(0, "Terrain runs crisp to the edge."),
-      cornerRadiusMm: pv(0.6, "Plan corner radius (the catalogue's corner treatment is undecided)."),
-      channelDiameterMm: pv(1.8, "Chain channel diameter; must suit the chosen chain."),
-      channelFromTopMm: pv(2.2, "Channel centre below the top edge."),
-      channelHeightMm: pv(1.8, "Channel centre above the back."),
-    },
-  },
-  charm: {
-    id: "charm",
-    label: "Charm (folded tab)",
-    profileId: "pendant-charm-preview-dev-1",
-    shape: "cushion",
-    attachment: "tab",
-    attachmentNote: "A flat strap folded over the top edge, joined to the cushion.",
-    defaultCoverage: { mode: "full" },
-    values: {
-      baseThicknessMm: pv(1.6, "Body thickness below the terrain baseline."),
-      maximumReliefMm: pv(1.4, "Terrain at 100% height."),
-      edgeRoundMm: pv(0.5, "Edge rounds."),
-      terrainFadeMm: pv(0, "Terrain runs to the edge."),
-      cornerRadiusRatio: pv(0.22, "Cushion corner radius as a share of the smaller side (the catalogue's radius is undecided)."),
-      tabWidthRatio: pv(0.25, "Tab width as a share of the body width."),
-      tabThicknessMm: pv(0.9, "Tab strap thickness."),
-      tabOpeningHeightMm: pv(3.0, "Tab clear opening, vertical."),
-      tabOpeningDepthMm: pv(2.4, "Tab clear opening, front to back."),
-      tabEmbedMm: pv(1.0, "How far the tab reaches into the top edge."),
-    },
-  },
 };
+
+/** Size labels (proposed; À Vie to approve), always shown with millimetres. */
+export const SIZE_LABELS = { petite: "Petite", classic: "Classic", statement: "Statement" } as const;
+
+/**
+ * Terrain coverage wording. "above_level" flattens everything below a chosen
+ * share of the place's relief: a stylised treatment, NOT a land/water mask.
+ * It is never a default; it applies only when chosen and is recorded.
+ */
+export const COVERAGE_LABELS = {
+  full: "Full relief",
+  above_level: "Flat below a chosen height (stylised; not a coastline)",
+} as const;
+
+/** "Classic · 12 × 20 mm": a size name never appears without its dimensions. */
+export function sizeLabel(presetId: string): string {
+  const p = getPreset(presetId);
+  const o = p.outline;
+  const mm =
+    o.shape === "round" ? `Ø${o.diameterMm.value} mm` : o.shape === "hexagon" ? `${o.acrossFlatsMm.value} mm across flats` : `${o.widthMm.value} × ${o.heightMm.value} mm`;
+  const name = SIZE_LABELS[p.sizeTier as keyof typeof SIZE_LABELS] ?? p.sizeTier;
+  return `${name} · ${mm}`;
+}
 
 const n = (s: PendantStyle, k: string) => {
   const v = s.values[k];

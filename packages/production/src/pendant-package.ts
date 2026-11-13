@@ -15,6 +15,8 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { validation } from "@avie/geometry";
+import { attachmentDiagnostics } from "@avie/geometry/terrain-pendant";
+import { METAL_DENSITY_SOURCE } from "@avie/geometry/terrain-ring";
 import { availabilityOf } from "@avie/product-types";
 import { boundingBox, signedVolume, weld } from "./mesh";
 import { canonical, PACKAGE_FORMAT_VERSION, sha256 } from "./package-builder";
@@ -71,9 +73,19 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   const near = (a: number[], b: number[], tol: number) => a.every((v, i) => Math.abs(v - b[i]!) <= tol);
   const box = boundingBox(pd.mesh), volume = signedVolume(pd.mesh);
   const back = weld(readBinaryStl(readFileSync(join(cad, "terrain-pendant.stl"))).mesh);
-  const dmBack = await read3dmComponents(readFileSync(join(cad, "terrain-pendant.3dm")), ["component", "units"], Object.keys(documentMeta));
+  const dmBack = await read3dmComponents(readFileSync(join(cad, "terrain-pendant.3dm")), ["component", "units"], Object.keys(documentMeta), true);
   const obj = dmBack.objects[0];
+  // Topology is re-checked on the files as written, against the style's expected topology.
+  const expected = pd.style.expectedTopology;
+  const topologyOf = (m: { positions: Float32Array; indices: Uint32Array } | undefined) => {
+    if (!m) return { checked: false, matchesExpected: false };
+    const t = validation.topologySummary(weld(m));
+    return { ...t, matchesExpected: t.shells === expected.shells && t.genus === expected.genus && t.boundaryEdges === 0 && t.nonManifoldEdges === 0 && t.misorientedEdges === 0 };
+  };
   const reopen = {
+    expectedTopology: expected,
+    stlTopology: topologyOf(back),
+    "3dmTopology": topologyOf(obj?.mesh),
     stl: {
       triangles: back.indices.length / 3,
       matchesTriangleCount: back.indices.length === pd.mesh.indices.length,
@@ -93,6 +105,8 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     },
   };
   const reopenOk = Object.values(reopen).every((r) => Object.values(r).every((v) => typeof v !== "boolean" || v));
+  // The raw stored mesh is not part of the written report.
+  if (obj) delete obj.mesh;
 
   // --- Validation: the solid, plus what cannot be assessed ------------------------
   const profile = { id: "awaiting-manufacturer", approved: false, minWallMm: null, minFeatureMm: null, maxReliefMm: null };
@@ -107,11 +121,23 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
   );
   const extra = {
     ...attachmentChecks,
-    genus: { status: pd.built.genus === (pd.params.attachment.kind === "none" ? 0 : 1) ? ("pass" as const) : ("fail" as const), method: "holes through the solid (manifold genus)", measured: pd.built.genus, note: "Expected 1: the chain channel, or the opening of the loop or tab." },
+    topology: {
+      status: pd.built.genus === expected.genus ? ("pass" as const) : ("fail" as const),
+      method: "holes through the solid (genus), compared with the style's declared topology",
+      measured: pd.built.genus,
+      required: expected.genus,
+      note: expected.note,
+    },
+    attachmentDiagnostics: {
+      status: "not_run" as const,
+      method: "measurements for the manufacturer; nothing is judged against a minimum",
+      measured: attachmentDiagnostics(pd.mesh, pd.params.outline, pd.params.baseThicknessMm, pd.params.attachment) as unknown as Record<string, number>,
+      note: "Chain fit is not assessed: no chain has been chosen.",
+    },
     attachmentStrength: { status: "not_run" as const, method: "none", note: "Joint strength, chain fit and wear are not assessed; they need the manufacturer and the chosen chain." },
     minimumRimAngle: { status: "not_run" as const, method: "not implemented for pendant outlines", note: "The ring's rim check covers straight long sides of a rectangular face; a perimeter-wide version for pendants is planned." },
   };
-  const valid = solidReport.valid && Object.values(attachmentChecks).every((c) => c.status === "pass") && extra.genus.status === "pass";
+  const valid = solidReport.valid && Object.values(attachmentChecks).every((c) => c.status === "pass") && extra.topology.status === "pass";
   const availability = availabilityOf(pd.preset);
   const validationReport = {
     ...solidReport,
@@ -170,7 +196,7 @@ export async function buildPendantPackage(opts: PendantPackageOptions) {
     coordinateSystem: "Right-handed, the piece lying face-up: origin at the body centre on the back plane; +Y relief; +X right seen from the front; top of the piece towards −Z. Terrain north towards the top. STL files carry no units: coordinates are millimetres.",
     dimensions: { body: { ...d.body, terrainReliefMm: +reliefMm.toFixed(3) }, overall: { ...d.overall, note: "Including the attachment." } },
     terrainCoverage: pd.params.coverage,
-    estimatedMassG: { value: +((d.volumeMm3 / 1000) * pd.densityGcm3).toFixed(2), metal: config.metal },
+    estimatedMassG: { value: +((d.volumeMm3 / 1000) * pd.densityGcm3).toFixed(2), metal: config.metal, densityGcm3: pd.densityGcm3, densitySource: METAL_DENSITY_SOURCE },
     previewOnlyValues: Object.fromEntries(Object.entries(pd.style.values).map(([k, v]) => [k, { value: v.value, status: v.status, note: v.note }])),
     manufacturingRequirements: Object.fromEntries(Object.entries(pd.preset.manufacturing).map(([k, v]) => [k, { value: v.value, status: v.status, owner: v.owner, note: v.note }])),
     components: [

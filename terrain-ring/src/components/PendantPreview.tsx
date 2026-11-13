@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { availabilityOf, getPreset, PENDANT_STYLES, type PendantStyleId } from "@avie/product-types";
+import { availabilityOf, COVERAGE_LABELS, getPreset, PENDANT_STYLES, sizeLabel, type PendantStyleId } from "@avie/product-types";
 import { createScene, type SceneContext, type ViewName } from "../three/scene";
 import { loadBakedSource } from "../three/heightmap-loader";
 import { METALS, type Metal } from "../three/materials";
@@ -17,7 +17,7 @@ type Built = Awaited<ReturnType<typeof buildPendantPreview>>;
 export function PendantPreview() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneContext | null>(null);
-  const [style, setStyle] = useState<PendantStyleId>("circle");
+  const [style, setStyle] = useState<PendantStyleId>("tablet_slider");
   const [tier, setTier] = useState<SizeTier>("classic");
   const [coverageMode, setCoverageMode] = useState<"style" | "full" | "above_level">("style");
   const [level, setLevel] = useState(0.3);
@@ -82,17 +82,18 @@ export function PendantPreview() {
       </section>
       <aside className="pendant-panel">
         <p className="pendant-warning" role="note"><strong>Internal prototype preview.</strong> Not for sale and not for production. Built with the preview-only profile <code>{styleInfo.profileId}</code>.</p>
-        <h1>{preset.label.replace(/ terrain pendant$/, "")} · {styleInfo.label}</h1>
+        <h1>{styleInfo.label}</h1>
+        <p className="small">{sizeLabel(preset.id)}{styleInfo.collection === "internal" ? " · internal prototype, not part of the proposed collection" : ""}</p>
         {!allowed && <p role="alert">This preset is not enabled for internal preview.</p>}
         {error && <p role="alert">Could not build this piece: {error}</p>}
         <label>Style <select value={style} onChange={(e) => setStyle(e.target.value as PendantStyleId)}>{Object.values(PENDANT_STYLES).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
-        <label>Size <select value={tier} onChange={(e) => setTier(e.target.value as SizeTier)}>{SIZE_TIERS.map((t) => <option key={t} value={t}>{t[0]!.toUpperCase() + t.slice(1)}</option>)}</select></label>
+        <label>Size <select value={tier} onChange={(e) => setTier(e.target.value as SizeTier)}>{SIZE_TIERS.map((t) => <option key={t} value={t}>{sizeLabel(presetFor(style, t))}</option>)}</select></label>
         <label>Terrain coverage <select value={coverageMode} onChange={(e) => setCoverageMode(e.target.value as typeof coverageMode)}>
-          <option value="style">Style default ({styleInfo.defaultCoverage.mode === "full" ? "full relief" : "raised land only"})</option>
-          <option value="full">Full relief</option>
-          <option value="above_level">Raised land only, flat below a level</option>
+          <option value="style">Style default ({COVERAGE_LABELS[styleInfo.defaultCoverage.mode].toLowerCase()})</option>
+          <option value="full">{COVERAGE_LABELS.full}</option>
+          <option value="above_level">{COVERAGE_LABELS.above_level}</option>
         </select></label>
-        {coverageMode === "above_level" && <label>Level {Math.round(level * 100)}% <input type="range" min={0} max={0.8} step={0.05} value={level} onChange={(e) => setLevel(+e.target.value)} /></label>}
+        {coverageMode === "above_level" && <label>Flat below {Math.round(level * 100)}% of the relief <input type="range" min={0} max={0.8} step={0.05} value={level} onChange={(e) => setLevel(+e.target.value)} /></label>}
         <label>Place <select value={placeName} onChange={(e) => setPlaceName(e.target.value)}>{PRESET_PLACES.map((p) => <option key={p.name}>{p.name}</option>)}</select></label>
         <label>Terrain height {Math.round(terrainHeight * 100)}% <input type="range" min={0.05} max={1} step={0.05} value={terrainHeight} onChange={(e) => setTerrainHeight(+e.target.value)} /></label>
         <label>Rotation {bearingDeg}° <input type="range" min={0} max={355} step={5} value={bearingDeg} onChange={(e) => setBearingDeg(+e.target.value)} /></label>
@@ -105,7 +106,7 @@ export function PendantPreview() {
             <dt>Body</dt><dd>{d.body.widthMm} × {d.body.heightMm} mm, {d.body.depthMm} mm deep</dd>
             <dt>Overall</dt><dd>{d.overall.widthMm} × {d.overall.heightMm} × {d.overall.depthMm} mm (W × H × D)</dd>
             <dt>Attachment</dt><dd>{styleInfo.attachmentNote}</dd>
-            <dt>Terrain</dt><dd>{coverage?.mode === "above_level" ? `raised above ${Math.round(coverage.level * 100)}% of the relief` : "full relief"}; {(place.lengthM / 1000).toFixed(1)} km across; north at the top</dd>
+            <dt>Terrain</dt><dd>{coverage?.mode === "above_level" ? `flat below ${Math.round(coverage.level * 100)}% of the relief (stylised, not a coastline)` : "full relief"}; {(place.lengthM / 1000).toFixed(1)} km across the width; north at the top</dd>
             <dt>Estimated mass</dt><dd>{massG!.toFixed(2)} g {METALS[metal].label}</dd>
           </dl>
         ) : <p>Building…</p>}

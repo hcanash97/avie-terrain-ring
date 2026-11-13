@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SURFACE, validateMesh, type ConstraintProfile, type Mesh } from "../src/validation/common";
+import { SURFACE, topologySummary, triangleQuality, validateMesh, type ConstraintProfile, type Mesh } from "../src/validation/common";
 import { rimAngleCheck } from "../src/validation/ring";
 
 /** Closed, outward-wound box from (0,0,0) to (sx,sy,sz), 12 triangles. */
@@ -153,5 +153,25 @@ describe("rim angle", () => {
   it("ignores the plan corners, where the height map edge lies outside the head", () => {
     const r = rimAngleCheck(field((x, d) => (Math.abs(x) > 4.05 ? Math.max(0, 1 - d / 0.3) : 0)), 45);
     expect(r.check.status).toBe("pass");
+  });
+});
+
+describe("triangle quality and topology summary", () => {
+  it("finds no slivers on a cube and reports its topology", () => {
+    const m = mesh(box(10, 10, 10));
+    expect(triangleQuality(m).nearDegenerate).toBe(0);
+    expect(topologySummary(m)).toEqual({ shells: 1, genus: 0, boundaryEdges: 0, nonManifoldEdges: 0, misorientedEdges: 0 });
+    expect(run(m).checks.triangleQuality!.status).toBe("pass");
+  });
+
+  it("reports a sliver triangle without failing the mesh", () => {
+    const sliver: Mesh = { positions: new Float32Array([0, 0, 0, 10, 0, 0, 5, 0.00001, 0]), indices: new Uint32Array([0, 1, 2]) };
+    expect(triangleQuality(sliver).nearDegenerate).toBe(1);
+  });
+
+  it("gives no genus for an open mesh", () => {
+    const b = box(10, 10, 10);
+    b.indices.splice(0, 3);
+    expect(topologySummary(mesh(b)).genus).toBeNull();
   });
 });

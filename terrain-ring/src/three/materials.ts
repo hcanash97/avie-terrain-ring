@@ -5,7 +5,8 @@ export type Finish = "polished" | "satin";
 
 /** Base colours approximate each alloy's measured reflectance (paler, less orange than a "gold" swatch). */
 export const METALS: Record<Metal, { label: string; short: string; color: number }> = {
-  silver_925: { label: "Recycled sterling silver", short: "925", color: 0xeeedea },
+  // "Recycled" stays out until the sourcing claim is confirmed (identifier unchanged).
+  silver_925: { label: "Sterling silver", short: "925", color: 0xeeedea },
   gold_9ct: { label: "9ct yellow gold", short: "9ct", color: 0xe2cb9f },
   gold_14ct: { label: "14ct yellow gold", short: "14ct", color: 0xe7c58c },
   gold_18ct: { label: "18ct yellow gold", short: "18ct", color: 0xe9c27a },

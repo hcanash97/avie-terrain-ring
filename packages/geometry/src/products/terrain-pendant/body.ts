@@ -35,7 +35,13 @@ export type PendantBodyParameters = {
   resolution: { rings: number; angular: number; round: number };
 };
 
-export const SURFACE_LABEL = { body: 0, terrain: 1, back: 2, rim: 3 } as const;
+/**
+ * Surface labels (values match validation's SURFACE): body (front field, side
+ * walls, plain rounds), terrain (raised relief), back (reverse; the "inner"
+ * surface for structural measurement), rim (edge rounds and wall strip carrying
+ * terrain), channel (walls cut by a chain channel), attachment (loop or tab).
+ */
+export const SURFACE_LABEL = { body: 0, terrain: 1, back: 2, rim: 3, channel: 4, attachment: 5 } as const;
 
 const smootherstep = (x: number) => {
   const t = Math.min(1, Math.max(0, x));

@@ -163,11 +163,13 @@ export async function finishPendant(body: TerrainProductMesh, outline: PendantOu
     blend[k] = numProp > 3 ? out.vertProperties[i * numProp + 3]! : 0;
   }
   const vert = (v: number) => used[to[v]!]!;
-  // Label each output triangle from its source: body triangles keep their label, attachment surfaces are body.
+  // Label each output triangle from its source: body triangles keep their label;
+  // surfaces from the cutter are channel walls, from a loop or tab attachment.
+  const fromAttachment = attachment.kind === "through_hole" ? SURFACE_LABEL.channel : SURFACE_LABEL.attachment;
   const nt = out.triVerts.length / 3, triLabel = new Uint8Array(nt);
   const runs = out.runIndex, ids = out.runOriginalID;
   for (let r = 0; r < ids.length; r++)
-    for (let t = runs[r]! / 3; t < runs[r + 1]! / 3; t++) triLabel[t] = ids[r] === bodyId ? out.faceID[t]! : SURFACE_LABEL.body;
+    for (let t = runs[r]! / 3; t < runs[r + 1]! / 3; t++) triLabel[t] = ids[r] === bodyId ? out.faceID[t]! : fromAttachment;
   const order = Array.from({ length: nt }, (_, t) => t).sort((a, b) => (triLabel[a] === SURFACE_LABEL.terrain ? 0 : 1) - (triLabel[b] === SURFACE_LABEL.terrain ? 0 : 1));
   const indices = new Uint32Array(nt * 3);
   order.forEach((t, k) => { indices[k * 3] = vert(out.triVerts[t * 3]!); indices[k * 3 + 1] = vert(out.triVerts[t * 3 + 1]!); indices[k * 3 + 2] = vert(out.triVerts[t * 3 + 2]!); });

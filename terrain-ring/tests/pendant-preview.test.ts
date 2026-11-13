@@ -5,7 +5,7 @@ import { meshVolume } from "../src/geometry/ring-blank";
 const hill = { radiusM: 20000, elevationAt: (e: number, n: number) => 500 + 300 * Math.exp(-(e * e + n * n) / 2e6) };
 
 describe("internal pendant preview", () => {
-  it.each([["circle", "pendant-round-classic", 18, 18], ["block", "pendant-tablet-classic", 12, 20], ["charm", "pendant-cushion-classic", 16, 16]] as const)(
+  it.each([["round_slider", "pendant-round-classic", 18, 18], ["tablet_slider", "pendant-tablet-classic", 12, 20], ["cushion_tab", "pendant-cushion-classic", 16, 16]] as const)(
     "%s uses the catalogue size and its style's preview-only profile",
     async (style, presetId, w, h) => {
       expect(presetFor(style, "classic")).toBe(presetId);
@@ -18,7 +18,7 @@ describe("internal pendant preview", () => {
   );
 
   it("stands the pendant up for display without mirroring it", async () => {
-    const b = await buildPendantPreview({ style: "circle-loop", tier: "classic", source: hill, lengthM: 6000, bearingDeg: 0, terrainHeight: 1, detail: "high" });
+    const b = await buildPendantPreview({ style: "round_loop", tier: "classic", source: hill, lengthM: 6000, bearingDeg: 0, terrainHeight: 1, detail: "high" });
     const m = pendantDisplayMesh(b.built.mesh);
     expect(meshVolume(m)).toBeGreaterThan(0); // a reflection would turn the volume negative
     let topY = -Infinity, bottomY = Infinity;
