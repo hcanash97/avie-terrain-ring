@@ -10,7 +10,7 @@ import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
 
 // Only a browser needs the URL; under Node (tests) the engine finds its own file.
 if (typeof document !== "undefined") configureManifoldWasm(manifoldWasmUrl);
-import { PENDANT_STYLES, pendantStyleParameters, type PendantStyleId } from "@avie/product-types";
+import { CHARM_STYLES, CHARM_SIZE_TIERS, charmStyleParameters, PENDANT_STYLES, pendantStyleParameters, type CharmStyleId, type PendantStyleId } from "@avie/product-types";
 import type { RingMesh } from "./ring-blank";
 
 export const PREVIEW_RESOLUTION = { rings: 80, angular: 280, round: 5 } as const;
@@ -18,6 +18,25 @@ export const SIZE_TIERS = ["petite", "classic", "statement"] as const;
 export type SizeTier = (typeof SIZE_TIERS)[number];
 
 export const presetFor = (style: PendantStyleId, tier: SizeTier) => `pendant-${PENDANT_STYLES[style].shape}-${tier}`;
+
+export { CHARM_SIZE_TIERS };
+export type CharmSizeTier = (typeof CHARM_SIZE_TIERS)[number];
+export const charmPresetFor = (style: CharmStyleId, tier: CharmSizeTier) => `charm-${CHARM_STYLES[style].shape}-${tier}`;
+
+type TerrainInput = { source: TerrainSource; lengthM: number; bearingDeg: number; terrainHeight: number; detail: Detail };
+type Params = ReturnType<typeof pendantStyleParameters>;
+
+async function buildPiece(params: Params, input: TerrainInput) {
+  const dims = { faceLengthMm: params.outline.widthMm, faceWidthMm: params.outline.heightMm, maxReliefMm: params.maximumReliefMm };
+  const terrain = buildTerrain(input.source, frameFor(input.lengthM, input.bearingDeg, dims), dims, { terrainHeight: input.terrainHeight, detail: input.detail }, 300);
+  const built = await createPendant({ ...params, terrain, resolution: PREVIEW_RESOLUTION, attachmentSegments: 48 });
+  return { params, terrain, built };
+}
+
+/** A charm from the same body generator, with its own preview-only values and face-plane loop. */
+export function buildCharmPreview(input: TerrainInput & { style: CharmStyleId; tier: CharmSizeTier; coverage?: TerrainCoverage }) {
+  return buildPiece(charmStyleParameters(charmPresetFor(input.style, input.tier), input.style, input.coverage), input);
+}
 
 export async function buildPendantPreview(input: {
   style: PendantStyleId;
@@ -29,11 +48,7 @@ export async function buildPendantPreview(input: {
   terrainHeight: number;
   detail: Detail;
 }) {
-  const params = pendantStyleParameters(presetFor(input.style, input.tier), input.style, input.coverage);
-  const dims = { faceLengthMm: params.outline.widthMm, faceWidthMm: params.outline.heightMm, maxReliefMm: params.maximumReliefMm };
-  const terrain = buildTerrain(input.source, frameFor(input.lengthM, input.bearingDeg, dims), dims, { terrainHeight: input.terrainHeight, detail: input.detail }, 300);
-  const built = await createPendant({ ...params, terrain, resolution: PREVIEW_RESOLUTION, attachmentSegments: 48 });
-  return { params, terrain, built };
+  return buildPiece(pendantStyleParameters(presetFor(input.style, input.tier), input.style, input.coverage), input);
 }
 
 /**

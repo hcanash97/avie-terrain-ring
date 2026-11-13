@@ -129,7 +129,7 @@ export const PENDANT_STYLES: Record<PendantStyleId, PendantStyle> = {
 };
 
 /** Size labels (proposed; À Vie to approve), always shown with millimetres. */
-export const SIZE_LABELS = { petite: "Petite", classic: "Classic", statement: "Statement" } as const;
+export const SIZE_LABELS = { petite: "Petite", classic: "Classic", statement: "Statement", larger: "Larger" } as const;
 
 /**
  * Terrain coverage wording. "above_level" flattens everything below a chosen

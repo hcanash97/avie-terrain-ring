@@ -7,6 +7,9 @@
  *   through_hole  hidden channel along X for the chain (a "slider")
  *   loop          round-section ring above the top edge, opening along X
  *   tab           flat folded strap above the top edge, opening along X
+ *   eye           round-section ring above the top edge lying in the plane of
+ *                 the face, opening front to back (a charm's fixed loop, for a
+ *                 jump ring or clasp)
  */
 import Module from "manifold-3d";
 import type { TerrainProductMesh } from "../shared/types";
@@ -17,7 +20,8 @@ export type PendantAttachment =
   | { kind: "none" }
   | { kind: "through_hole"; diameterMm: number; centreFromTopMm: number; centreHeightMm: number }
   | { kind: "loop"; openingHeightMm: number; openingDepthMm: number; wallMm: number; embedMm: number }
-  | { kind: "tab"; widthMm: number; thicknessMm: number; openingHeightMm: number; openingDepthMm: number; embedMm: number };
+  | { kind: "tab"; widthMm: number; thicknessMm: number; openingHeightMm: number; openingDepthMm: number; embedMm: number }
+  | { kind: "eye"; openingHeightMm: number; openingWidthMm: number; wallMm: number; embedMm: number };
 
 /** Largest surface movement allowed when cleaning boolean seams. */
 export const SEAM_TOLERANCE_MM = 1e-4;
@@ -54,16 +58,23 @@ const manifold = () => {
   return wasmPromise;
 };
 
-/** Closed ring: a section swept round an ellipse in the Y–Z plane (opening along X). */
-function sweptLoop(centre: { y: number; z: number }, ay: number, az: number, section: [number, number][], segments: number) {
+/**
+ * Closed ring: a section swept round an ellipse. In the Y–Z plane (opening along
+ * X) the ellipse's first semi-axis runs along Y; in the X–Z plane (opening along
+ * Y, the face plane) it runs along X. The section's first coordinate lies along
+ * the opening axis, its second along the ellipse normal.
+ */
+function sweptLoop(centre: { y: number; z: number }, a1: number, az: number, section: [number, number][], segments: number, plane: "yz" | "xz" = "yz") {
   const positions: number[] = [];
   for (let i = 0; i < segments; i++) {
     const t = (2 * Math.PI * i) / segments;
-    const py = centre.y + ay * Math.cos(t), pz = centre.z + az * Math.sin(t);
-    let ny = Math.cos(t) / ay, nz = Math.sin(t) / az;
-    const l = Math.hypot(ny, nz);
-    ny /= l; nz /= l;
-    for (const [sx, sn] of section) positions.push(sx, py + ny * sn, pz + nz * sn);
+    const p1 = a1 * Math.cos(t), pz = centre.z + az * Math.sin(t);
+    let n1 = Math.cos(t) / a1, nz = Math.sin(t) / az;
+    const l = Math.hypot(n1, nz);
+    n1 /= l; nz /= l;
+    for (const [sa, sn] of section)
+      if (plane === "yz") positions.push(sa, centre.y + p1 + n1 * sn, pz + nz * sn);
+      else positions.push(p1 + n1 * sn, centre.y + sa, pz + nz * sn);
   }
   const n = section.length, indices: number[] = [];
   for (let i = 0; i < segments; i++)
@@ -140,6 +151,16 @@ export async function finishPendant(body: TerrainProductMesh, outline: PendantOu
     ringMesh.merge();
     result = solidBody.add(new w.Manifold(ringMesh));
     checks.push({ name: "attachmentOverlapsBody", ok: attachment.embedMm > 0, detail: `reaches ${attachment.embedMm} mm into the top edge` });
+  } else if (attachment.kind === "eye") {
+    const wire = attachment.wallMm;
+    const ax = attachment.openingWidthMm / 2 + wire / 2, az = attachment.openingHeightMm / 2 + wire / 2;
+    const centre = { y: baseThicknessMm / 2, z: top - az - wire / 2 + attachment.embedMm };
+    const ring = sweptLoop(centre, ax, az, roundSection(wire, 24), segments * 2, "xz");
+    const ringMesh = new w.Mesh({ numProp: 3, vertProperties: ring.positions, triVerts: ring.indices });
+    ringMesh.merge();
+    result = solidBody.add(new w.Manifold(ringMesh));
+    checks.push({ name: "attachmentOverlapsBody", ok: attachment.embedMm > 0, detail: `reaches ${attachment.embedMm} mm into the top edge` });
+    checks.push({ name: "eyeWithinBodyDepth", ok: wire <= baseThicknessMm, detail: `wire ${wire} mm against ${baseThicknessMm} mm of base under the terrain` });
   }
 
   // Booleans can leave slivers at the seam; simplify removes triangles that are
@@ -200,7 +221,7 @@ export async function finishPendant(body: TerrainProductMesh, outline: PendantOu
     },
     attachment,
     genus,
-    joined: attachment.kind === "loop" || attachment.kind === "tab",
+    joined: attachment.kind === "loop" || attachment.kind === "tab" || attachment.kind === "eye",
     checks: [{ name: "booleanStatus", ok: status === "NoError", detail: String(status) }, ...checks],
   };
 }

@@ -3,26 +3,35 @@ import { ProductImage } from "./ProductImage";
 import { LoadingOverlay } from "./LoadingOverlay";
 import { withTimeout } from "../lib/withTimeout";
 import { useEffect, useRef, useState } from "react";
-import { availabilityOf, COVERAGE_LABELS, getPreset, PENDANT_STYLES, sizeLabel, type PendantStyleId } from "@avie/product-types";
+import { availabilityOf, CHARM_STYLES, COVERAGE_LABELS, getPreset, PENDANT_STYLES, sizeLabel, type CharmStyleId, type PendantStyleId } from "@avie/product-types";
 import { createScene, type SceneContext, type ViewName } from "../three/scene";
 import { loadBakedSource } from "../three/heightmap-loader";
 import { METALS, type Metal } from "../three/materials";
 import { PRESET_PLACES } from "../state/terrainStore";
 import type { TerrainSource } from "../geometry/heightmap";
 import { METAL_DENSITY_G_CM3 } from "../geometry/ring-blank";
-import { buildPendantPreview, pendantDisplayMesh, presetFor, SIZE_TIERS, type SizeTier } from "../geometry/pendant-preview";
+import { buildCharmPreview, buildPendantPreview, CHARM_SIZE_TIERS, charmPresetFor, pendantDisplayMesh, presetFor, SIZE_TIERS, type CharmSizeTier, type SizeTier } from "../geometry/pendant-preview";
+
+export type PreviewProduct = "pendant" | "charm";
+const PRODUCT_NOUN: Record<PreviewProduct, string> = { pendant: "pendant", charm: "charm" };
+/** Size tiers differ by family; petite and classic carry across, the largest maps to the largest. */
+const tierFor = (product: PreviewProduct, tier: string): string =>
+  tier === "statement" && product === "charm" ? "larger" : tier === "larger" && product === "pendant" ? "statement" : tier;
 
 type Built = Awaited<ReturnType<typeof buildPendantPreview>>;
 
 /**
- * Internal prototype preview of the pendant styles (#pendant-preview). Not linked
- * from the customer configurator; shows every preview-only value it relies on.
+ * Internal prototype preview of the pendant and charm styles (#pendant-preview,
+ * #charm-preview). Not linked from the customer configurator; shows every
+ * preview-only value it relies on.
  */
-export function PendantPreview() {
+export function PendantPreview({ initialProduct = "pendant" }: { initialProduct?: PreviewProduct }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneContext | null>(null);
+  const [product, setProduct] = useState<PreviewProduct>(initialProduct);
   const [style, setStyle] = useState<PendantStyleId>("tablet_slider");
-  const [tier, setTier] = useState<SizeTier>("classic");
+  const [charmStyle, setCharmStyle] = useState<CharmStyleId>("round_charm");
+  const [tier, setTier] = useState<string>("classic");
   const [coverageMode, setCoverageMode] = useState<"style" | "full" | "above_level">("style");
   const [level, setLevel] = useState(0.3);
   const [placeName, setPlaceName] = useState(PRESET_PLACES[0]!.name);
@@ -39,9 +48,15 @@ export function PendantPreview() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const place = PRESET_PLACES.find((p) => p.name === placeName)!;
-  const preset = getPreset(presetFor(style, tier));
+  const isCharm = product === "charm";
+  const presetOf = (t: string) => (isCharm ? charmPresetFor(charmStyle, t as CharmSizeTier) : presetFor(style, t as SizeTier));
+  const tiers: readonly string[] = isCharm ? CHARM_SIZE_TIERS : SIZE_TIERS;
+  const preset = getPreset(presetOf(tier));
   const allowed = availabilityOf(preset).allowed.internalPreview;
-  const styleInfo = PENDANT_STYLES[style];
+  const styleInfo = isCharm ? CHARM_STYLES[charmStyle] : PENDANT_STYLES[style];
+  const internalOnly = "collection" in styleInfo && styleInfo.collection === "internal";
+  const noun = PRODUCT_NOUN[product];
+  const chooseProduct = (next: PreviewProduct) => { setProduct(next); setTier((t) => tierFor(next, t)); };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -73,13 +88,14 @@ export function PendantPreview() {
     setBuilt(null);
     const coverage = coverageMode === "style" ? undefined : coverageMode === "full" ? { mode: "full" as const } : { mode: "above_level" as const, level };
     const id = setTimeout(() => {
-      withTimeout(buildPendantPreview({ style, tier, coverage, source, lengthM: place.lengthM, bearingDeg, terrainHeight, detail: "high" }), 20000)
+      const terrain = { coverage, source, lengthM: place.lengthM, bearingDeg, terrainHeight, detail: "high" as const };
+      withTimeout(isCharm ? buildCharmPreview({ ...terrain, style: charmStyle, tier: tier as CharmSizeTier }) : buildPendantPreview({ ...terrain, style, tier: tier as SizeTier }), 20000)
         .then((b) => { if (!cancelled) { setBuilt(b); setError(null); } })
         .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); })
         .finally(() => { if (!cancelled) setPending(false); });
     }, 80);
     return () => { cancelled = true; clearTimeout(id); };
-  }, [source, allowed, style, tier, coverageMode, level, place.lengthM, bearingDeg, terrainHeight, attempt]);
+  }, [source, allowed, isCharm, style, charmStyle, tier, coverageMode, level, place.lengthM, bearingDeg, terrainHeight, attempt]);
 
   useEffect(() => { if (built) sceneRef.current?.setRing(pendantDisplayMesh(built.built.mesh)); }, [built]);
   useEffect(() => { sceneRef.current?.setMaterial(metal, "polished"); }, [metal, built]);
@@ -93,10 +109,10 @@ export function PendantPreview() {
   return (
     <main className="pendant-preview">
       <a className="back-to-ring" href="#">← Back to Terra Ring</a>
-      <section className="stage pendant-stage" aria-label="Pendant prototype preview">
-        <div ref={containerRef} className="viewer" aria-label="3D preview of the pendant prototype. Drag to rotate." />
-        {pending && <LoadingOverlay label="Preparing pendant preview…" />}
-        {(error || sourceError || graphicsError) && <div className="preview-error" role="alert"><ProductImage name={`pendant-${style}`} /><h2>Preview unavailable</h2><p>{sourceError ?? "The 3D model couldn’t load here. Your choices have been kept."}</p><p className="small">Style illustration shown; it does not show your selected landscape.</p><button className="btn-secondary" onClick={() => setAttempt((v) => v + 1)}>Retry preview</button></div>}
+      <section className="stage pendant-stage" aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)} prototype preview`}>
+        <div ref={containerRef} className="viewer" aria-label={`3D preview of the ${noun} prototype. Drag to rotate.`} />
+        {pending && <LoadingOverlay label={`Preparing ${noun} preview…`} />}
+        {(error || sourceError || graphicsError) && <div className="preview-error" role="alert">{!isCharm && <ProductImage name={`pendant-${style}`} />}<h2>Preview unavailable</h2><p>{sourceError ?? "The 3D model couldn’t load here. Your choices have been kept."}</p>{!isCharm && <p className="small">Style illustration shown; it does not show your selected landscape.</p>}<button className="btn-secondary" onClick={() => setAttempt((v) => v + 1)}>Retry preview</button></div>}
         <div className="view-bar" role="group" aria-label="Camera views">
           {(["front", "three_quarter", "side", "top"] as ViewName[]).map((v) => (
             <button key={v} className={view === v ? "on" : ""} aria-pressed={view === v} onClick={() => setView(v)}>{v === "three_quarter" ? "¾" : v[0]!.toUpperCase() + v.slice(1)}</button>
@@ -104,13 +120,16 @@ export function PendantPreview() {
         </div>
       </section>
       <aside className="pendant-panel">
-        <p className="pendant-warning" role="note"><strong>Internal prototype preview.</strong> Not for sale or production. Attachment strength and chain fit are awaiting manufacturer review.</p>
+        <p className="pendant-warning" role="note"><strong>Internal prototype preview.</strong> Not for sale or production. {isCharm ? "Loop strength and jump-ring or clasp fit are awaiting manufacturer review; how a charm hangs is still to be decided." : "Attachment strength and chain fit are awaiting manufacturer review."}</p>
         <h1>{styleInfo.label}</h1>
-        <p className="small">{sizeLabel(preset.id)}{styleInfo.collection === "internal" ? " · internal prototype, not part of the proposed collection" : ""}</p>
+        <p className="small">{sizeLabel(preset.id)}{internalOnly ? " · internal prototype, not part of the proposed collection" : ""}</p>
         {!allowed && <p role="alert">This preset is not enabled for internal preview.</p>}
 
-        <Choice label="Pendant style" variant="card" value={style} options={Object.values(PENDANT_STYLES).map((v) => ({ value: v.id, label: v.label.replace(/^Terrain /, ""), note: v.attachmentNote, icon: <ProductImage name={`pendant-${v.id}`} /> }))} onChange={setStyle} />
-        <label>Size <select value={tier} onChange={(e) => setTier(e.target.value as SizeTier)}>{SIZE_TIERS.map((t) => <option key={t} value={t}>{sizeLabel(presetFor(style, t))}</option>)}</select></label>
+        <Choice label="Piece" value={product} options={[{ value: "pendant", label: "Pendant" }, { value: "charm", label: "Charm" }]} onChange={chooseProduct} />
+        {isCharm
+          ? <Choice label="Charm style" variant="card" value={charmStyle} options={Object.values(CHARM_STYLES).map((v) => ({ value: v.id, label: v.label.replace(/^Terrain /, ""), note: v.attachmentNote }))} onChange={setCharmStyle} />
+          : <Choice label="Pendant style" variant="card" value={style} options={Object.values(PENDANT_STYLES).map((v) => ({ value: v.id, label: v.label.replace(/^Terrain /, ""), note: v.attachmentNote, icon: <ProductImage name={`pendant-${v.id}`} /> }))} onChange={setStyle} />}
+        <label>Size <select value={tier} onChange={(e) => setTier(e.target.value)}>{tiers.map((t) => <option key={t} value={t}>{sizeLabel(presetOf(t))}</option>)}</select></label>
         <label>Terrain coverage <select value={coverageMode} onChange={(e) => setCoverageMode(e.target.value as typeof coverageMode)}>
           <option value="style">Style default ({COVERAGE_LABELS[styleInfo.defaultCoverage.mode].toLowerCase()})</option>
           <option value="full">{COVERAGE_LABELS.full}</option>
@@ -144,7 +163,7 @@ export function PendantPreview() {
         </tbody></table>
 
         <h2>Not decided</h2>
-        <p>The attachment is joined into one solid, but its strength and chain fit are not assessed. Awaiting the manufacturer: {Object.keys(preset.manufacturing).join(", ")}. Chain: awaiting an approved supplied chain.</p>
+        <p>The attachment is joined into one solid, but its strength and {isCharm ? "jump-ring or clasp" : "chain"} fit are not assessed. Awaiting the manufacturer: {Object.keys(preset.manufacturing).join(", ")}. {isCharm ? `Awaiting the supplier: ${Object.keys(preset.components).join(", ")}. Awaiting À Vie: ${Object.keys(preset.design).join(", ")}.` : "Chain: awaiting an approved supplied chain."}</p>
         </details>
       </aside>
     </main>

@@ -8,6 +8,7 @@ export * from "./availability";
 export * from "./gemstones";
 export * from "./preview-profiles";
 export * from "./pendant-styles";
+export * from "./charm-styles";
 export { RING_SIZING, RING_STYLES, RING_SHOULDERS, RING_INNER_PROFILES } from "./ring";
 export { PROPOSED_SOURCE } from "./build";
 
