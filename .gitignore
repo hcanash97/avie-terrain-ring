@@ -1,4 +1,5 @@
 node_modules/
+.wrangler/
 terrain-ring/dist/
 terrain-ring/artifact/
 captures/
